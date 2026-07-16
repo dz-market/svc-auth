@@ -16,14 +16,18 @@ type Config struct {
 }
 
 type HTTP struct {
-	Addr string `koanf:"addr"`
+	Addr              string        `koanf:"addr"`
+	ReadHeaderTimeout time.Duration `koanf:"read_header_timeout"`
+	ReadTimeout       time.Duration `koanf:"read_timeout"`
+	WriteTimeout      time.Duration `koanf:"write_timeout"`
+	IdleTimeout       time.Duration `koanf:"idle_timeout"`
 }
 
 type Log struct {
 	Level string `koanf:"level"`
 }
 
-func Load(path string) (Config, error) {
+func Load() (Config, error) {
 	k := koanf.New(".")
 
 	if err := k.Load(file.Provider("config/config.yml"), yaml.Parser()); err != nil {

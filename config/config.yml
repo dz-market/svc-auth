@@ -1,5 +1,11 @@
 http:
     addr: ":9101"
+    read_header_timeout: 5s
+    read_timeout: 10s
+    write_timeout: 10s
+    idle_timeout: 60s
+
 log:
     level: info
+
 shutdown_timeout: 10s
