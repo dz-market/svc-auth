@@ -261,6 +261,7 @@ linters:
                 - after-expr
                 - assign-exclusive
                 - assign-expr
+                - after-decl
 
     exclusions:
         presets:
