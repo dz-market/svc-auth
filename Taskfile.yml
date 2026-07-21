@@ -39,6 +39,6 @@ tasks:
             - goose -dir {{.MIGRATIONS_DIR}} postgres "$POSTGRES_DSN" up
 
     migration:down:
-        desc: Rool back last migration
+        desc: Roll back last migration
         cmds:
             - goose -dir {{.MIGRATIONS_DIR}} postgres "$POSTGRES_DSN" down
