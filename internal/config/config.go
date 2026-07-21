@@ -1,43 +1,53 @@
 package config
 
 import (
-	"fmt"
 	"time"
-
-	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/file"
-	"github.com/knadh/koanf/v2"
 )
 
 type Config struct {
-	HTTP            HTTP          `koanf:"http"`
-	Log             Log           `koanf:"log"`
-	ShutdownTimeout time.Duration `koanf:"shutdown_timeout"`
+	HTTP            HTTP          `yaml:"http"`
+	GRPC            GRPC          `yaml:"grpc"`
+	Postgres        Postgres      `yaml:"postgres"`
+	Tokens          Tokens        `yaml:"tokens"`
+	Log             Log           `yaml:"log"`
+	ShutdownTimeout time.Duration `validate:"gt=0" yaml:"shutdown_timeout"`
 }
 
 type HTTP struct {
-	Addr              string        `koanf:"addr"`
-	ReadHeaderTimeout time.Duration `koanf:"read_header_timeout"`
-	ReadTimeout       time.Duration `koanf:"read_timeout"`
-	WriteTimeout      time.Duration `koanf:"write_timeout"`
-	IdleTimeout       time.Duration `koanf:"idle_timeout"`
+	Addr              string        `validate:"required" yaml:"addr"`
+	ReadHeaderTimeout time.Duration `validate:"gt=0"     yaml:"read_header_timeout"`
+	ReadTimeout       time.Duration `validate:"gt=0"     yaml:"read_timeout"`
+	WriteTimeout      time.Duration `validate:"gt=0"     yaml:"write_timeout"`
+	IdleTimeout       time.Duration `validate:"gt=0"     yaml:"idle_timeout"`
+}
+
+type GRPC struct {
+	Addr string `validate:"required" yaml:"addr"`
+}
+
+type Postgres struct {
+	DSN             string        `validate:"required"                yaml:"dsn"`
+	MinConns        int32         `validate:"gte=0,ltefield=MaxConns" yaml:"min_conns"`
+	MaxConns        int32         `validate:"gt=0"                    yaml:"max_conns"`
+	ConnectTimeout  time.Duration `validate:"gt=0"                    yaml:"connect_timeout"`
+	MaxConnLifetime time.Duration `validate:"gt=0"                    yaml:"max_conn_lifetime"`
+}
+
+type Tokens struct {
+	Access  AccessToken  `yaml:"access"`
+	Refresh RefreshToken `yaml:"refresh"`
+}
+
+type AccessToken struct {
+	Secret string        `validate:"required,min=32" yaml:"secret"`
+	TTL    time.Duration `validate:"gt=0"            yaml:"ttl"`
+}
+
+type RefreshToken struct {
+	TTL     time.Duration `validate:"gt=0"   yaml:"ttl"`
+	ByteLen int           `validate:"gte=32" yaml:"byte_len"`
 }
 
 type Log struct {
-	Level string `koanf:"level"`
-}
-
-func Load() (Config, error) {
-	k := koanf.New(".")
-
-	if err := k.Load(file.Provider("config/config.yml"), yaml.Parser()); err != nil {
-		return Config{}, fmt.Errorf("load config: %w", err)
-	}
-
-	var cfg Config
-	if err := k.Unmarshal("", &cfg); err != nil {
-		return Config{}, fmt.Errorf("unmarshal config: %w", err)
-	}
-
-	return cfg, nil
+	Level string `validate:"required,sloglevel" yaml:"level"`
 }
