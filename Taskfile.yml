@@ -1,5 +1,11 @@
 version: "3"
 
+dotenv:
+    - .env
+
+vars:
+    MIGRATIONS_DIR: migrations
+
 tasks:
     lint:
         desc: Run golangci-lint
@@ -15,3 +21,24 @@ tasks:
         desc: Rewrite code that uses outdated Go APIs
         cmds:
             - go fix ./...
+
+    migration:create:
+        desc: Create goose migration
+        cmds:
+            - mkdir -p {{.MIGRATIONS_DIR}}
+            - goose -dir {{.MIGRATIONS_DIR}} create {{.CLI_ARGS}} sql
+
+    migration:status:
+        desc: Show migration status
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} postgres "$POSTGRES_DSN" status
+
+    migration:up:
+        desc: Apply migrations
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} postgres "$POSTGRES_DSN" up
+
+    migration:down:
+        desc: Rool back last migration
+        cmds:
+            - goose -dir {{.MIGRATIONS_DIR}} postgres "$POSTGRES_DSN" down
