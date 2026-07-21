@@ -31,6 +31,7 @@ type Postgres struct {
 	MaxConns        int32         `validate:"gt=0"                    yaml:"max_conns"`
 	ConnectTimeout  time.Duration `validate:"gt=0"                    yaml:"connect_timeout"`
 	MaxConnLifetime time.Duration `validate:"gt=0"                    yaml:"max_conn_lifetime"`
+	MaxConnIdleTime time.Duration `validate:"gt=0"                    yaml:"max_conn_idle_time"`
 }
 
 type Tokens struct {
@@ -49,5 +50,6 @@ type RefreshToken struct {
 }
 
 type Log struct {
-	Level string `validate:"required,sloglevel" yaml:"level"`
+	Level  string `validate:"required,sloglevel"       yaml:"level"`
+	Format string `validate:"required,oneof=json text" yaml:"format"`
 }

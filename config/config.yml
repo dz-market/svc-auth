@@ -14,16 +14,18 @@ postgres:
     max_conns: 10
     connect_timeout: 5s
     max_conn_lifetime: 30m
+    max_conn_idle_time: 30m
 
 tokens:
     access:
         secret: ${ACCESS_TOKEN_SECRET}
-        TTL: 15m
+        ttl: 15m
     refresh:
         ttl: 720h
         byte_len: 32
 
 log:
     level: info
+    format: json
 
 shutdown_timeout: 10s
