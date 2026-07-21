@@ -75,8 +75,9 @@ func (r *RefreshTokenRepo) Rotate(ctx context.Context, oldHash []byte, newToken 
 	if err != nil {
 		return fmt.Errorf("begin rotate tx: %w", err)
 	}
+
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 	}()
 
 	revokeSQL, revokeArgs, err := r.sb.
