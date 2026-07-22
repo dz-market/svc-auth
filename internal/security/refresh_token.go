@@ -16,7 +16,7 @@ func NewRefreshTokenGenerator(byteLen int) RefreshTokenGenerator {
 }
 
 func (g RefreshTokenGenerator) Generate() (raw string, hash []byte, err error) {
-	b := make([]byte, g.byteLen)
+	b := make([]byte, g.byteLen) // nolint:makezero // sized buffer required for rand.Read
 	if _, err := rand.Read(b); err != nil {
 		return "", nil, fmt.Errorf("read random: %w", err)
 	}
@@ -28,5 +28,6 @@ func (g RefreshTokenGenerator) Generate() (raw string, hash []byte, err error) {
 
 func HashRefreshToken(raw string) []byte {
 	sum := sha256.Sum256([]byte(raw))
+
 	return sum[:]
 }

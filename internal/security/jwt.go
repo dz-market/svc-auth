@@ -9,19 +9,20 @@ import (
 )
 
 type Claims struct {
-	SessionID uuid.UUID `json:"sid"`
 	jwt.RegisteredClaims
+
+	SessionID uuid.UUID `json:"sid"`
 }
 
 type TokenManager struct {
 	secret []byte
-	TTL    time.Duration
+	ttl    time.Duration
 }
 
-func NewTokenManager(secret string, TTL time.Duration) TokenManager {
+func NewTokenManager(secret string, ttl time.Duration) TokenManager {
 	return TokenManager{
 		secret: []byte(secret),
-		TTL:    TTL,
+		ttl:    ttl,
 	}
 }
 
@@ -32,7 +33,7 @@ func (m TokenManager) Issue(userID, sessionID uuid.UUID) (string, error) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.TTL)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
 		},
 	}
 
