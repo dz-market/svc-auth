@@ -1,6 +1,7 @@
 package security
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"time"
 
@@ -14,19 +15,13 @@ type Claims struct {
 	SessionID uuid.UUID `json:"sid"`
 }
 
-type TokenManager struct {
-	secret []byte
-	ttl    time.Duration
+type AccessManager struct {
+	publicKey  *rsa.PublicKey
+	privateKey *rsa.PrivateKey
+	ttl        time.Duration
 }
 
-func NewTokenManager(secret string, ttl time.Duration) TokenManager {
-	return TokenManager{
-		secret: []byte(secret),
-		ttl:    ttl,
-	}
-}
-
-func (m TokenManager) Issue(userID, sessionID uuid.UUID) (string, error) {
+func (m AccessManager) Issue(userID, sessionID uuid.UUID) (string, error) {
 	now := time.Now()
 	claims := Claims{
 		SessionID: sessionID,
@@ -37,7 +32,7 @@ func (m TokenManager) Issue(userID, sessionID uuid.UUID) (string, error) {
 		},
 	}
 
-	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.secret)
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(m.privateKey)
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
@@ -45,13 +40,15 @@ func (m TokenManager) Issue(userID, sessionID uuid.UUID) (string, error) {
 	return signed, nil
 }
 
-func (m TokenManager) Parse(raw string) (Claims, error) {
+func (m AccessManager) Parse(raw string) (Claims, error) {
 	var claims Claims
 
 	_, err := jwt.ParseWithClaims(
-		raw, claims, func(*jwt.Token) (any, error) {
-			return m.secret, nil
+		raw, &claims,
+		func(*jwt.Token) (any, error) {
+			return m.publicKey, nil
 		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
 	)
 	if err != nil {
 		return Claims{}, err
