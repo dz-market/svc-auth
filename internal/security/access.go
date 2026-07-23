@@ -21,23 +21,24 @@ type AccessManager struct {
 	ttl        time.Duration
 }
 
-func (m AccessManager) Issue(userID, sessionID uuid.UUID) (string, error) {
+func (m AccessManager) Issue(userID, sessionID uuid.UUID) (string, time.Time, error) {
 	now := time.Now()
+	expiresAt := now.Add(m.ttl)
 	claims := Claims{
 		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
 	}
 
 	signed, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(m.privateKey)
 	if err != nil {
-		return "", fmt.Errorf("sign token: %w", err)
+		return "", time.Time{}, fmt.Errorf("sign token: %w", err)
 	}
 
-	return signed, nil
+	return signed, expiresAt, nil
 }
 
 func (m AccessManager) Parse(raw string) (Claims, error) {

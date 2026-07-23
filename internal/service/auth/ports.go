@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -27,7 +28,7 @@ type PasswordHasher interface {
 }
 
 type AccessIssuer interface {
-	Issue(userID, sessionID uuid.UUID) (string, error)
+	Issue(userID, sessionID uuid.UUID) (string, time.Time, error)
 }
 
 type RefreshGenerator interface {
