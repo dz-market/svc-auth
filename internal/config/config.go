@@ -40,8 +40,9 @@ type Tokens struct {
 }
 
 type AccessToken struct {
-	Secret string        `validate:"required,min=32" yaml:"secret"`
-	TTL    time.Duration `validate:"gt=0"            yaml:"ttl"`
+	PublicKeyPath  string        `validate:"required" yaml:"public_key_path"`
+	PrivateKeyPath string        `validate:"required" yaml:"private_key_path"`
+	TTL            time.Duration `validate:"gt=0"     yaml:"ttl"`
 }
 
 type RefreshToken struct {
