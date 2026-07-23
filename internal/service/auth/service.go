@@ -14,8 +14,10 @@ import (
 )
 
 type TokenPair struct {
-	Access  string
-	Refresh string
+	Access           string
+	AccessExpiresAt  time.Time
+	Refresh          string
+	RefreshExpiresAt time.Time
 }
 
 type Service struct {
@@ -42,19 +44,24 @@ func New(
 	}
 }
 
-func (s *Service) Register(ctx context.Context, email, password string) (TokenPair, error) {
+func (s *Service) Register(ctx context.Context, email, password string) (uuid.UUID, TokenPair, error) {
 	passwordHash, err := s.hasher.Hash(password)
 	if err != nil {
-		return TokenPair{}, fmt.Errorf("hash password: %w", err)
+		return uuid.Nil, TokenPair{}, fmt.Errorf("hash password: %w", err)
 	}
 
 	user := domain.NewUser(email, passwordHash)
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		return TokenPair{}, err
+		return uuid.Nil, TokenPair{}, err
 	}
 
-	return s.issueTokens(ctx, user.ID)
+	pair, err := s.issueTokens(ctx, user.ID)
+	if err != nil {
+		return uuid.Nil, TokenPair{}, err
+	}
+
+	return user.ID, pair, nil
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (TokenPair, error) {
@@ -99,12 +106,14 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 		return TokenPair{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 
+	newExp := time.Now().Add(s.refreshTTL)
+
 	newToken := domain.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    old.UserID,
 		SessionID: old.SessionID,
 		TokenHash: newHash,
-		ExpiresAt: time.Now().Add(s.refreshTTL),
+		ExpiresAt: newExp,
 	}
 
 	if err := s.refreshRepo.Rotate(ctx, oldHash, newToken); err != nil {
@@ -119,14 +128,16 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 		return TokenPair{}, fmt.Errorf("rotate refresh token: %w", err)
 	}
 
-	accessToken, err := s.access.Issue(old.UserID, old.SessionID)
+	accessToken, accessExp, err := s.access.Issue(old.UserID, old.SessionID)
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("issue access token: %w", err)
 	}
 
 	return TokenPair{
-		Access:  accessToken,
-		Refresh: newRaw,
+		Access:           accessToken,
+		AccessExpiresAt:  accessExp,
+		Refresh:          newRaw,
+		RefreshExpiresAt: newExp,
 	}, nil
 }
 
@@ -143,7 +154,7 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 func (s *Service) issueTokens(ctx context.Context, userID uuid.UUID) (TokenPair, error) {
 	sessionID := uuid.New()
 
-	accessToken, err := s.access.Issue(userID, sessionID)
+	accessToken, accessExp, err := s.access.Issue(userID, sessionID)
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("issue access token: %w", err)
 	}
@@ -153,12 +164,14 @@ func (s *Service) issueTokens(ctx context.Context, userID uuid.UUID) (TokenPair,
 		return TokenPair{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 
+	refreshExp := time.Now().Add(s.refreshTTL)
+
 	refreshToken := domain.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    userID,
 		SessionID: sessionID,
 		TokenHash: refreshHash,
-		ExpiresAt: time.Now().Add(s.refreshTTL),
+		ExpiresAt: refreshExp,
 	}
 
 	if err := s.refreshRepo.Store(ctx, refreshToken); err != nil {
@@ -166,7 +179,9 @@ func (s *Service) issueTokens(ctx context.Context, userID uuid.UUID) (TokenPair,
 	}
 
 	return TokenPair{
-		Access:  accessToken,
-		Refresh: refreshRaw,
+		Access:           accessToken,
+		AccessExpiresAt:  accessExp,
+		Refresh:          refreshRaw,
+		RefreshExpiresAt: refreshExp,
 	}, nil
 }
