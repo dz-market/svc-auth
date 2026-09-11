@@ -1,0 +1,9 @@
+shutdown_timeout: 10s
+
+grpc:
+    addr: "${GRPC_ADDR}"
+    reflection: "${GRPC_REFLECTION:-false}"
+
+log:
+    level: info
+    format: json
