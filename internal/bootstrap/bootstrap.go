@@ -3,11 +3,11 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os/signal"
 	"syscall"
 
 	"github.com/dz-market/svc-auth/internal/config"
+	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 )
 
@@ -31,15 +31,29 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
-	log.InfoContext(
-		ctx, "starting",
-		slog.String("addr", cfg.GRPC.Addr),
-		slog.Bool("reflection", cfg.GRPC.Reflection),
+	srv := server.New(
+		server.Options{
+			Addr:       cfg.GRPC.Addr,
+			Reflection: cfg.GRPC.Reflection,
+		},
+		log,
 	)
 
-	<-ctx.Done()
+	errCh := make(chan error, 1)
 
-	log.InfoContext(ctx, "shutting down", slog.Duration("timeout", cfg.ShutdownTimeout))
+	go func() {
+		errCh <- srv.Serve(ctx)
+	}()
+
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("grpc server: %w", err)
+
+	case <-ctx.Done():
+		log.InfoContext(ctx, "shutdown requested")
+	}
+
+	srv.Shutdown(ctx, cfg.ShutdownTimeout)
 
 	return nil
 }
