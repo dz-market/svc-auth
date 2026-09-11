@@ -4,6 +4,9 @@ grpc:
     addr: "${GRPC_ADDR}"
     reflection: "${GRPC_REFLECTION:-false}"
 
+postgres:
+    dsn: "${POSTGRES_DSN}"
+
 log:
     level: info
-    format: json
+    format: text
