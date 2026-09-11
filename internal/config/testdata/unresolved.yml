@@ -1,0 +1,7 @@
+shutdown_timeout: 10s
+
+grpc:
+    addr: ${GRPC_ADDR}
+
+log:
+    format: ${LOG_FORMAT}
