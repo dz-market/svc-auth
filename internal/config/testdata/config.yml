@@ -4,6 +4,13 @@ grpc:
     addr: ${GRPC_ADDR:-:50051}
     reflection: ${GRPC_REFLECTION:-false}
 
+postgres:
+    dsn: postgres-dsn
+
+health:
+    period: 5s
+    timeout: 2s
+
 log:
     level: ${LOG_LEVEL:-info}
     format: ${LOG_FORMAT:-json}
