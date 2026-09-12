@@ -10,6 +10,8 @@ func validConfig() Config {
 	return Config{
 		ShutdownTimeout: 10 * time.Second,
 		GRPC:            GRPC{Addr: ":50051"},
+		Postgres:        Postgres{DSN: "postgres-dsn"},
+		Health:          Health{Period: 5 * time.Second, Timeout: 2 * time.Second},
 		Log:             Log{Level: slog.LevelInfo, Format: "json"},
 	}
 }
@@ -25,22 +27,27 @@ func TestValidate(t *testing.T) {
 		{name: "complete", mutate: func(*Config) {}},
 		{name: "no shutdown timeout", mutate: func(c *Config) { c.ShutdownTimeout = 0 }, wantErr: true},
 		{name: "no grpc address", mutate: func(c *Config) { c.GRPC.Addr = "" }, wantErr: true},
+		{name: "no postgres dsn", mutate: func(c *Config) { c.Postgres.DSN = "" }, wantErr: true},
+		{name: "no health period", mutate: func(c *Config) { c.Health.Period = 0 }, wantErr: true},
+		{name: "no health timeout", mutate: func(c *Config) { c.Health.Timeout = 0 }, wantErr: true},
 		{name: "no log format", mutate: func(c *Config) { c.Log.Format = "" }, wantErr: true},
 		{name: "unsupported log format", mutate: func(c *Config) { c.Log.Format = "unsupported" }, wantErr: true},
 		{name: "text log format", mutate: func(c *Config) { c.Log.Format = "text" }},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
 
-			cfg := validConfig()
-			tt.mutate(&cfg)
+				cfg := validConfig()
+				tt.mutate(&cfg)
 
-			err := cfg.validate()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+				err := cfg.validate()
+				if (err != nil) != tt.wantErr {
+					t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
 	}
 }

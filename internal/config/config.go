@@ -8,13 +8,31 @@ import (
 type Config struct {
 	ShutdownTimeout time.Duration `validate:"required" yaml:"shutdown_timeout"`
 
-	GRPC GRPC `yaml:"grpc"`
-	Log  Log  `yaml:"log"`
+	GRPC     GRPC     `yaml:"grpc"`
+	Postgres Postgres `yaml:"postgres"`
+	Health   Health   `yaml:"health"`
+	Log      Log      `yaml:"log"`
 }
 
 type GRPC struct {
 	Addr       string `validate:"required" yaml:"addr"`
 	Reflection bool   `yaml:"reflection"`
+}
+
+type Postgres struct {
+	DSN               string        `validate:"required"        yaml:"dsn"`
+	MaxConns          int32         `yaml:"max_conns"`
+	MinConns          int32         `yaml:"min_conns"`
+	MaxConnLifetime   time.Duration `yaml:"max_conn_lifetime"`
+	MaxConnIdleTime   time.Duration `yaml:"max_conn_idle_time"`
+	HealthCheckPeriod time.Duration `yaml:"health_check_period"`
+	ConnectTimeout    time.Duration `yaml:"connect_timeout"`
+	PingTimeout       time.Duration `yaml:"ping_timeout"`
+}
+
+type Health struct {
+	Period  time.Duration `validate:"required" yaml:"period"`
+	Timeout time.Duration `validate:"required" yaml:"timeout"`
 }
 
 type Log struct {
