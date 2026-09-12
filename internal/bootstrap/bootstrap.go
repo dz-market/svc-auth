@@ -8,6 +8,7 @@ import (
 
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
+	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 )
@@ -32,6 +33,13 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
+	monitor := health.New(
+		health.Options{
+			Period:  cfg.Health.Period,
+			Timeout: cfg.Health.Timeout,
+		}, log,
+	)
+
 	db, err := postgres.New(
 		ctx, postgres.Options{
 			DSN:               cfg.Postgres.DSN,
@@ -50,6 +58,8 @@ func Run(ctx context.Context, version string) error {
 
 	defer db.Close()
 
+	monitor.Register("postgres", db)
+
 	srv := server.New(
 		server.Options{
 			Addr:       cfg.GRPC.Addr,
@@ -57,6 +67,10 @@ func Run(ctx context.Context, version string) error {
 		},
 		log,
 	)
+
+	monitor.OnChange(srv.SetServing)
+
+	go monitor.Run(ctx)
 
 	errCh := make(chan error, 1)
 
