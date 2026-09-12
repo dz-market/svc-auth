@@ -24,6 +24,8 @@ func TestLoadDefaults(t *testing.T) {
 	want := Config{
 		ShutdownTimeout: 10 * time.Second,
 		GRPC:            GRPC{Addr: ":50051", Reflection: false},
+		Postgres:        Postgres{DSN: "postgres-dsn"},
+		Health:          Health{Period: 5 * time.Second, Timeout: 2 * time.Second},
 		Log:             Log{Level: slog.LevelInfo, Format: "json"},
 	}
 
@@ -58,6 +60,8 @@ func TestLoadOverridesDefaults(t *testing.T) {
 	want := Config{
 		ShutdownTimeout: 30 * time.Second,
 		GRPC:            GRPC{Addr: ":50052", Reflection: true},
+		Postgres:        Postgres{DSN: "postgres-dsn"},
+		Health:          Health{Period: 5 * time.Second, Timeout: 2 * time.Second},
 		Log:             Log{Level: slog.LevelDebug, Format: "text"},
 	}
 
