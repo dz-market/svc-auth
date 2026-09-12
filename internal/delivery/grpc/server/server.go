@@ -85,3 +85,14 @@ func (s *Server) Shutdown(ctx context.Context, timeout time.Duration) {
 		s.grpc.Stop()
 	}
 }
+
+//nolint:revive // the signature must match health.Notifier to be passed as a callback
+func (s *Server) SetServing(healthy bool) {
+	status := healthpb.HealthCheckResponse_NOT_SERVING
+
+	if healthy {
+		status = healthpb.HealthCheckResponse_SERVING
+	}
+
+	s.health.SetServingStatus("", status)
+}
