@@ -10,6 +10,7 @@ type Config struct {
 
 	GRPC     GRPC     `yaml:"grpc"`
 	Postgres Postgres `yaml:"postgres"`
+	Health   Health   `yaml:"health"`
 	Log      Log      `yaml:"log"`
 }
 
@@ -27,6 +28,11 @@ type Postgres struct {
 	HealthCheckPeriod time.Duration `yaml:"health_check_period"`
 	ConnectTimeout    time.Duration `yaml:"connect_timeout"`
 	PingTimeout       time.Duration `yaml:"ping_timeout"`
+}
+
+type Health struct {
+	Period  time.Duration `validate:"required" yaml:"period"`
+	Timeout time.Duration `validate:"required" yaml:"timeout"`
 }
 
 type Log struct {
