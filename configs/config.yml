@@ -14,6 +14,10 @@ postgres:
     connect_timeout: 5s
     ping_timeout: 2s
 
+health:
+    period: 5s
+    timeout: 2s
+
 log:
     level: info
     format: text
