@@ -20,7 +20,7 @@ type GRPC struct {
 }
 
 type Postgres struct {
-	DSN               string        `validate:"required" yaml:"dsn"`
+	DSN               string        `validate:"required"        yaml:"dsn"`
 	MaxConns          int32         `yaml:"max_conns"`
 	MinConns          int32         `yaml:"min_conns"`
 	MaxConnLifetime   time.Duration `yaml:"max_conn_lifetime"`
