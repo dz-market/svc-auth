@@ -30,7 +30,7 @@ func New(opts Options) *slog.Logger {
 		handler = slog.NewJSONHandler(os.Stdout, handlerOpts)
 	}
 
-	return slog.New(handler).With(
+	return slog.New(contextHandler{handler}).With(
 		slog.String("service", opts.Service),
 		slog.String("version", opts.Version),
 	)
