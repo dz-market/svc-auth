@@ -3,105 +3,114 @@ package health
 import (
 	"context"
 	"log/slog"
+	"slices"
+	"sync"
 	"time"
 )
 
-type Checker interface {
-	Ping(ctx context.Context) error
+type Probe func(ctx context.Context) error
+
+type check struct {
+	name  string
+	probe Probe
+	up    bool
 }
 
-type Notifier func(healthy bool)
-
-type Options struct {
-	Period  time.Duration
-	Timeout time.Duration
-}
-
-type Monitor struct {
-	checks  map[string]Checker
-	states  map[string]bool
-	notify  []Notifier
-	period  time.Duration
+type Checker struct {
 	timeout time.Duration
-	healthy bool
 	log     *slog.Logger
+
+	mu     sync.Mutex
+	checks []*check
+
+	healthy bool
 }
 
-func New(opts Options, log *slog.Logger) *Monitor {
-	return &Monitor{
-		checks:  make(map[string]Checker),
-		states:  make(map[string]bool),
-		period:  opts.Period,
-		timeout: opts.Timeout,
-		healthy: true,
+func New(log *slog.Logger, timeout time.Duration) *Checker {
+	return &Checker{
+		timeout: timeout,
 		log:     log,
+		healthy: true,
 	}
 }
 
-func (m *Monitor) Register(name string, check Checker) {
-	m.checks[name] = check
-	m.states[name] = true
+func (c *Checker) Register(name string, probe Probe) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.checks = append(c.checks, &check{name: name, probe: probe, up: true})
 }
 
-func (m *Monitor) OnChange(fn Notifier) {
-	m.notify = append(m.notify, fn)
-}
-
-func (m *Monitor) Run(ctx context.Context) {
-	ticker := time.NewTicker(m.period)
+func (c *Checker) Run(ctx context.Context, period time.Duration, onChange func(healthy bool)) error {
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
+
+	c.evaluate(ctx, onChange)
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 
 		case <-ticker.C:
-			m.check(ctx)
+			c.evaluate(ctx, onChange)
 		}
 	}
 }
 
-func (m *Monitor) check(ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, m.timeout)
-	defer cancel()
+func (c *Checker) evaluate(ctx context.Context, onChange func(bool)) {
+	c.mu.Lock()
+	checks := slices.Clone(c.checks)
+	c.mu.Unlock()
 
 	healthy := true
 
-	for name, check := range m.checks {
-		err := check.Ping(ctx)
+	for _, check := range checks {
+		err := c.probe(ctx, check.probe)
 		up := err == nil
 
 		if !up {
 			healthy = false
 		}
 
-		if up == m.states[name] {
+		if up == check.up {
+			c.log.DebugContext(
+				ctx, "health check completed",
+				slog.String("dependency", check.name),
+			)
+
 			continue
 		}
 
-		m.states[name] = up
+		check.up = up
 
 		if up {
-			m.log.InfoContext(ctx, "dependency restored", "dependency", name)
+			c.log.InfoContext(
+				ctx, "dependency restored",
+				slog.String("dependency", check.name),
+			)
 
 			continue
 		}
 
-		m.log.ErrorContext(
+		c.log.ErrorContext(
 			ctx, "dependency unavailable",
-			"dependency", name,
-			"err", err,
+			slog.String("dependency", check.name),
+			slog.Any("err", err),
 		)
 	}
 
-	if healthy == m.healthy {
+	if healthy == c.healthy {
 		return
 	}
 
-	m.healthy = healthy
+	c.healthy = healthy
+	onChange(healthy)
+}
 
-	for _, fn := range m.notify {
-		fn(healthy)
-	}
+func (c *Checker) probe(ctx context.Context, probe Probe) error {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	return probe(ctx)
 }
