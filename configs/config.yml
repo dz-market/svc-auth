@@ -4,6 +4,10 @@ shutdown_timeout: 10s
 grpc:
     addr: "${GRPC_ADDR}"
     reflection: "${GRPC_REFLECTION:-false}"
+    max_recv_msg_size: 1MB
+    keepalive:
+        max_connection_age: 30m
+        max_connection_age_grace: 10m
 
 postgres:
     dsn: "${POSTGRES_DSN}"

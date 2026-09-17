@@ -147,9 +147,12 @@ func Run(ctx context.Context, version string) error {
 
 	srv := server.New(
 		server.Options{
-			Addr:       cfg.GRPC.Addr,
-			Reflection: cfg.GRPC.Reflection,
-			Validator:  validator,
+			Addr:                  cfg.GRPC.Addr,
+			Reflection:            cfg.GRPC.Reflection,
+			MaxRecvMsgSize:        cfg.GRPC.MaxRecvMsgSize.Bytes(),
+			MaxConnectionAge:      cfg.GRPC.Keepalive.MaxConnectionAge,
+			MaxConnectionAgeGrace: cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
+			Validator:             validator,
 		},
 		log,
 	)
