@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -10,40 +11,32 @@ func TestDecode(t *testing.T) {
 	t.Parallel()
 
 	tree := map[string]any{
-		"shutdown_timeout": "10s",
-		"grpc": map[string]any{
-			"addr":       ":50051",
-			"reflection": "true",
-		},
-		"log": map[string]any{
+		"duration": "10s",
+		"nested": map[string]any{
+			"string": "value",
+			"bool":   "true",
 			"level":  "debug",
-			"format": "json",
+			"list":   []any{"a", "b"},
 		},
 	}
 
-	cfg, err := decode(tree)
+	got, err := decode[testConfig](tree)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if cfg.ShutdownTimeout != 10*time.Second {
-		t.Errorf("ShutdownTimeout = %v, want 10s", cfg.ShutdownTimeout)
+	want := testConfig{
+		Duration: 10 * time.Second,
+		Nested: testNested{
+			String: "value",
+			Bool:   true,
+			Level:  slog.LevelDebug,
+			List:   []string{"a", "b"},
+		},
 	}
 
-	if cfg.GRPC.Addr != ":50051" {
-		t.Errorf("GRPC.Addr = %v, want %q", cfg.GRPC.Addr, ":50051")
-	}
-
-	if !cfg.GRPC.Reflection {
-		t.Error("GRPC.Reflection = false, want true")
-	}
-
-	if cfg.Log.Level != slog.LevelDebug {
-		t.Errorf("Log.Level = %v, want DEBUG", cfg.Log.Level)
-	}
-
-	if cfg.Log.Format != "json" {
-		t.Errorf("Log.Format = %v, want %q", cfg.Log.Format, "json")
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("decode() = %+v, want = %+v", got, want)
 	}
 }
 
@@ -55,9 +48,9 @@ func TestDecodeRejects(t *testing.T) {
 		tree map[string]any
 	}{
 		{name: "unknown top-level key", tree: map[string]any{"unknown": "value"}},
-		{name: "unknown nested key", tree: map[string]any{"grpc": map[string]any{"unknown": "value"}}},
-		{name: "unparsable duration", tree: map[string]any{"shutdown_timeout": "second"}},
-		{name: "unparsable log level", tree: map[string]any{"log": map[string]any{"level": "unknown"}}},
+		{name: "unknown nested key", tree: map[string]any{"nested": map[string]any{"unknown": "value"}}},
+		{name: "unparsable duration", tree: map[string]any{"duration": "second"}},
+		{name: "unparsable log level", tree: map[string]any{"nested": map[string]any{"level": "unknown"}}},
 	}
 
 	for _, tt := range tests {
@@ -65,7 +58,7 @@ func TestDecodeRejects(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				if _, err := decode(tt.tree); err == nil {
+				if _, err := decode[testConfig](tt.tree); err == nil {
 					t.Error("decode: want error, got nil")
 				}
 			},
@@ -76,12 +69,12 @@ func TestDecodeRejects(t *testing.T) {
 func TestDecodeMissingLevelDefaultsToInfo(t *testing.T) {
 	t.Parallel()
 
-	cfg, err := decode(map[string]any{"log": map[string]any{"format": "json"}})
+	got, err := decode[testConfig](map[string]any{"nested": map[string]any{"string": "value"}})
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if cfg.Log.Level != slog.LevelInfo {
-		t.Errorf("Log.Level = %v, want INFO", cfg.Log.Level)
+	if got.Nested.Level != slog.LevelInfo {
+		t.Errorf("Nested.Level = %v, want INFO", got.Nested.Level)
 	}
 }

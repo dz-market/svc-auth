@@ -1,19 +1,14 @@
 package config
 
 import (
-	"log/slog"
 	"testing"
-	"time"
 )
 
-func validConfig() Config {
-	return Config{
-		ShutdownTimeout: 10 * time.Second,
-		GRPC:            GRPC{Addr: ":50051"},
-		Postgres:        Postgres{DSN: "postgres-dsn"},
-		Health:          Health{Period: 5 * time.Second, Timeout: 2 * time.Second},
-		Log:             Log{Level: slog.LevelInfo, Format: "json"},
-	}
+type validatable struct {
+	String string   `validate:"required" yaml:"string"`
+	Enum   string   `validate:"required,oneof=on off" yaml:"enum"`
+	Int    int      `validate:"omitempty,min=1" yaml:"int"`
+	List   []string `validate:"omitempty,dive,required" yaml:"list"`
 }
 
 func TestValidate(t *testing.T) {
@@ -21,18 +16,15 @@ func TestValidate(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		mutate  func(*Config)
+		give    validatable
 		wantErr bool
 	}{
-		{name: "complete", mutate: func(*Config) {}},
-		{name: "no shutdown timeout", mutate: func(c *Config) { c.ShutdownTimeout = 0 }, wantErr: true},
-		{name: "no grpc address", mutate: func(c *Config) { c.GRPC.Addr = "" }, wantErr: true},
-		{name: "no postgres dsn", mutate: func(c *Config) { c.Postgres.DSN = "" }, wantErr: true},
-		{name: "no health period", mutate: func(c *Config) { c.Health.Period = 0 }, wantErr: true},
-		{name: "no health timeout", mutate: func(c *Config) { c.Health.Timeout = 0 }, wantErr: true},
-		{name: "no log format", mutate: func(c *Config) { c.Log.Format = "" }, wantErr: true},
-		{name: "unsupported log format", mutate: func(c *Config) { c.Log.Format = "unsupported" }, wantErr: true},
-		{name: "text log format", mutate: func(c *Config) { c.Log.Format = "text" }},
+		{name: "complete", give: validatable{String: "value", Enum: "on"}},
+		{name: "missing required", give: validatable{String: "value"}, wantErr: true},
+		{name: "value outside oneof", give: validatable{String: "value", Enum: "unknown"}, wantErr: true},
+		{name: "optional omitted", give: validatable{String: "value", Enum: "off"}},
+		{name: "optional below min", give: validatable{String: "value", Enum: "on", Int: -1}, wantErr: true},
+		{name: "empty item in list", give: validatable{String: "value", Enum: "on", List: []string{""}}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -40,11 +32,7 @@ func TestValidate(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				cfg := validConfig()
-				tt.mutate(&cfg)
-
-				err := cfg.validate()
-				if (err != nil) != tt.wantErr {
+				if err := validate(tt.give); (err != nil) != tt.wantErr {
 					t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},

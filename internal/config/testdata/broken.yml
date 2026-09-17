@@ -1,2 +1,2 @@
-grpc:
-    addr: "broken
+nested:
+    string: "unterminated
