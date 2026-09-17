@@ -1,3 +1,4 @@
+service_name: svc-auth
 shutdown_timeout: 10s
 
 grpc:
@@ -13,6 +14,26 @@ postgres:
     health_check_period: 1m
     connect_timeout: 5s
     ping_timeout: 2s
+
+auth:
+    access:
+        ttl: 15m
+        issuer: svc-auth
+        audience: [marketplace]
+        private_key_path: "${ACCESS_PRIVATE_KEY_PATH}"
+        public_key_path: "${ACCESS_PUBLIC_KEY_PATH}"
+    refresh:
+        length: 32
+    session:
+        ttl: 720h
+    password:
+        argon2id:
+            memory_kib: 19456
+            iterations: 2
+            parallelism: 1
+            salt_length: 16
+            key_length: 32
+            max_in_flight: 8
 
 health:
     period: 5s
