@@ -5,9 +5,9 @@ import (
 )
 
 type validatable struct {
-	String string   `validate:"required" yaml:"string"`
-	Enum   string   `validate:"required,oneof=on off" yaml:"enum"`
-	Int    int      `validate:"omitempty,min=1" yaml:"int"`
+	String string   `validate:"required"                yaml:"string"`
+	Enum   string   `validate:"required,oneof=on off"   yaml:"enum"`
+	Int    int      `validate:"omitempty,min=1"         yaml:"int"`
 	List   []string `validate:"omitempty,dive,required" yaml:"list"`
 }
 
