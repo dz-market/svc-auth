@@ -1,8 +1,0 @@
-shutdown_timeout: 10s
-
-grpc:
-    reflection: false
-
-log:
-    level: info
-    format: json
