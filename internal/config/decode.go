@@ -6,9 +6,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
-func decode(tree map[string]any) (Config, error) {
-	var cfg Config
-
+func decode[T any](tree map[string]any) (cfg T, err error) {
 	dec, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{
 			Result:           &cfg,
@@ -22,11 +20,11 @@ func decode(tree map[string]any) (Config, error) {
 		},
 	)
 	if err != nil {
-		return Config{}, fmt.Errorf("build decoder: %w", err)
+		return cfg, fmt.Errorf("build decoder: %w", err)
 	}
 
 	if err := dec.Decode(tree); err != nil {
-		return Config{}, fmt.Errorf("decode config: %w", err)
+		return cfg, fmt.Errorf("decode config: %w", err)
 	}
 
 	return cfg, nil

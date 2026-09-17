@@ -6,7 +6,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func (c Config) validate() error {
+func validate(cfg any) error {
 	v := validator.New(validator.WithRequiredStructEnabled())
 
 	v.RegisterTagNameFunc(
@@ -15,5 +15,5 @@ func (c Config) validate() error {
 		},
 	)
 
-	return v.Struct(c)
+	return v.Struct(cfg)
 }
