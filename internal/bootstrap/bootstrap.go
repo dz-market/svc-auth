@@ -104,9 +104,9 @@ func Run(ctx context.Context, version string) error {
 		return fmt.Errorf("refresh token generator: %w", err)
 	}
 
-	hasher, err := argon2id.New(
+	hasher := argon2id.New(
 		argon2id.Params{
-			MemoryKiB:   cfg.Auth.Password.Argon2ID.MemoryKiB,
+			MemoryKiB:   cfg.Auth.Password.Argon2ID.Memory.KiB(),
 			Iterations:  cfg.Auth.Password.Argon2ID.Iterations,
 			Parallelism: cfg.Auth.Password.Argon2ID.Parallelism,
 			SaltLength:  cfg.Auth.Password.Argon2ID.SaltLength,
@@ -114,9 +114,6 @@ func Run(ctx context.Context, version string) error {
 			MaxInFlight: cfg.Auth.Password.Argon2ID.MaxInFlight,
 		},
 	)
-	if err != nil {
-		return fmt.Errorf("password hasher: %w", err)
-	}
 
 	uow := postgres.NewUnitOfWork(
 		db, func(q postgres.Querier) auth.Repositories {

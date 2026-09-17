@@ -48,7 +48,7 @@ type Access struct {
 }
 
 type Refresh struct {
-	Length int `validate:"required" yaml:"length"`
+	Length int `validate:"required,min=32" yaml:"length"`
 }
 
 type Session struct {
@@ -60,12 +60,12 @@ type Password struct {
 }
 
 type Argon2ID struct {
-	MemoryKiB   uint32 `validate:"required" yaml:"memory_kib"`
-	Iterations  uint32 `validate:"required" yaml:"iterations"`
-	Parallelism uint8  `validate:"required" yaml:"parallelism"`
-	SaltLength  uint32 `validate:"required" yaml:"salt_length"`
-	KeyLength   uint32 `validate:"required" yaml:"key_length"`
-	MaxInFlight int    `validate:"required" yaml:"max_in_flight"`
+	Memory      ByteSize `validate:"required,minsize=15MB,maxsize=1GB" yaml:"memory"`
+	Iterations  uint32   `validate:"required,min=1"                    yaml:"iterations"`
+	Parallelism uint8    `validate:"required,min=1"                    yaml:"parallelism"`
+	SaltLength  uint32   `validate:"required,min=16"                   yaml:"salt_length"`
+	KeyLength   uint32   `validate:"required,min=32"                   yaml:"key_length"`
+	MaxInFlight int      `validate:"required,min=1"                    yaml:"max_in_flight"`
 }
 
 type Health struct {

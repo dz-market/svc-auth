@@ -28,7 +28,7 @@ auth:
         ttl: 720h
     password:
         argon2id:
-            memory_kib: 19456
+            memory: 19MB
             iterations: 2
             parallelism: 1
             salt_length: 16
