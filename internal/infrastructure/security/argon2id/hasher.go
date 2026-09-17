@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/argon2"
@@ -24,24 +23,15 @@ type Hasher struct {
 	sem chan struct{}
 }
 
-func New(p Params) (*Hasher, error) {
-	switch {
-	case p.MemoryKiB < 15*1024:
-		return nil, fmt.Errorf("memory %d KiB is below the 15 MiB minimum", p.MemoryKiB)
-	case p.Iterations < 1:
-		return nil, errors.New("iterations must be >= 1")
-	case p.Parallelism < 1:
-		return nil, errors.New("parallelism must be >= 1")
-	case p.SaltLength < 16:
-		return nil, errors.New("saltLength must be >= 16")
-	case p.KeyLength < 32:
-		return nil, errors.New("keyLength must be >= 32")
+func New(p Params) *Hasher {
+	if p.MaxInFlight < 1 {
+		p.MaxInFlight = 1
 	}
 
 	return &Hasher{
 		p:   p,
 		sem: make(chan struct{}, p.MaxInFlight),
-	}, nil
+	}
 }
 
 func (h *Hasher) Hash(ctx context.Context, password string) (string, error) {
