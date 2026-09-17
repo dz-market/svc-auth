@@ -15,6 +15,7 @@ type Options struct {
 	Hasher            PasswordHasher
 	AccessTokenIssuer AccessTokenIssuer
 	RefreshGenerator  RefreshTokenGenerator
+	Clock             Clock
 	AccessTokenTTL    time.Duration
 	SessionTTL        time.Duration
 	Log               *slog.Logger
@@ -25,6 +26,7 @@ type Service struct {
 	hasher                PasswordHasher
 	accessTokenIssuer     AccessTokenIssuer
 	refreshTokenGenerator RefreshTokenGenerator
+	clock                 Clock
 	accessTokenTTL        time.Duration
 	sessionTTL            time.Duration
 	log                   *slog.Logger
@@ -36,6 +38,7 @@ func New(opts Options) *Service {
 		hasher:                opts.Hasher,
 		accessTokenIssuer:     opts.AccessTokenIssuer,
 		refreshTokenGenerator: opts.RefreshGenerator,
+		clock:                 opts.Clock,
 		accessTokenTTL:        opts.AccessTokenTTL,
 		sessionTTL:            opts.SessionTTL,
 		log:                   opts.Log,
@@ -58,7 +61,7 @@ type RegisterOutput struct {
 }
 
 func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutput, error) {
-	now := time.Now().UTC()
+	now := s.clock.Now()
 
 	passwordHash, err := s.hasher.Hash(ctx, in.Password)
 	if err != nil {

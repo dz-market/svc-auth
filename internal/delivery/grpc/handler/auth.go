@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,21 +15,25 @@ import (
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
-type AuthService interface {
-	Register(ctx context.Context, in auth.RegisterInput) (auth.RegisterOutput, error)
+type Options struct {
+	Service AuthService
+	Clock   Clock
+	Log     *slog.Logger
 }
 
 type Auth struct {
 	authv1.UnimplementedAuthServiceServer
 
 	service AuthService
+	clock   Clock
 	log     *slog.Logger
 }
 
-func NewAuth(service AuthService, log *slog.Logger) *Auth {
+func NewAuth(opts Options) *Auth {
 	return &Auth{
-		service: service,
-		log:     log,
+		service: opts.Service,
+		clock:   opts.Clock,
+		log:     opts.Log,
 	}
 }
 
@@ -45,7 +48,7 @@ func (h *Auth) Register(ctx context.Context, req *authv1.RegisterRequest) (*auth
 		return nil, h.toStatus(ctx, err)
 	}
 
-	return mapper.ToRegisterResponse(out, time.Now().UTC()), nil
+	return mapper.ToRegisterResponse(out, h.clock.Now()), nil
 }
 
 func (h *Auth) toStatus(ctx context.Context, err error) error {
