@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/argon2"
@@ -28,13 +29,13 @@ func New(p Params) (*Hasher, error) {
 	case p.MemoryKiB < 15*1024:
 		return nil, fmt.Errorf("memory %d KiB is below the 15 MiB minimum", p.MemoryKiB)
 	case p.Iterations < 1:
-		return nil, fmt.Errorf("iterations must be >= 1")
+		return nil, errors.New("iterations must be >= 1")
 	case p.Parallelism < 1:
-		return nil, fmt.Errorf("parallelism must be >= 1")
+		return nil, errors.New("parallelism must be >= 1")
 	case p.SaltLength < 16:
-		return nil, fmt.Errorf("saltLength must be >= 16")
+		return nil, errors.New("saltLength must be >= 16")
 	case p.KeyLength < 32:
-		return nil, fmt.Errorf("keyLength must be >= 32")
+		return nil, errors.New("keyLength must be >= 32")
 	}
 
 	return &Hasher{
@@ -44,6 +45,7 @@ func New(p Params) (*Hasher, error) {
 }
 
 func (h *Hasher) Hash(ctx context.Context, password string) (string, error) {
+	//nolint:makezero // rand.Read fills the slice by its length; a zero-length one would read no bytes
 	salt := make([]byte, h.p.SaltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("read salt: %w", err)

@@ -10,8 +10,6 @@ import (
 	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
-var method = jwtgo.SigningMethodRS256
-
 type Claims struct {
 	jwtgo.RegisteredClaims
 
@@ -51,7 +49,8 @@ func NewIssuer(opts IssuerOptions) (*Issuer, error) {
 
 func (i *Issuer) Issue(userID, sessionID uuid.UUID, issuedAt, expiresAt time.Time) (string, error) {
 	token := jwtgo.NewWithClaims(
-		method, Claims{
+		//nolint:modernize // the embedded struct is set explicitly on purpose
+		jwtgo.SigningMethodRS256, Claims{
 			SessionID: sessionID,
 			RegisteredClaims: jwtgo.RegisteredClaims{
 				Issuer:    i.issuer,
