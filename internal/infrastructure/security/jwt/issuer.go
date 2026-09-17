@@ -30,13 +30,8 @@ type Issuer struct {
 }
 
 func NewIssuer(opts IssuerOptions) (*Issuer, error) {
-	switch {
-	case opts.Key.Private == nil:
+	if opts.Key.Private == nil {
 		return nil, errors.New("private key is required")
-	case opts.Issuer == "":
-		return nil, errors.New("issuer is required")
-	case opts.Audience == nil:
-		return nil, errors.New("audience is required")
 	}
 
 	return &Issuer{
