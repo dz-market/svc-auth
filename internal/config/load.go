@@ -43,6 +43,19 @@ func withLookup(fn lookupFunc) Option {
 }
 
 func Load(opts ...Option) (Config, error) {
+	cfg, err := load[Config](opts...)
+	if err != nil {
+		return Config{}, err
+	}
+
+	if err := validate(cfg); err != nil {
+		return Config{}, fmt.Errorf("validate config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func load[T any](opts ...Option) (cfg T, err error) {
 	l := loader{
 		configPath: defaultConfigPath,
 		envPath:    defaultEnvPath,
@@ -55,7 +68,7 @@ func Load(opts ...Option) (Config, error) {
 	if l.lookup == nil {
 		lookup, err := envLookup(l.envPath)
 		if err != nil {
-			return Config{}, fmt.Errorf("load env: %w", err)
+			return cfg, fmt.Errorf("load env: %w", err)
 		}
 
 		l.lookup = lookup
@@ -63,12 +76,12 @@ func Load(opts ...Option) (Config, error) {
 
 	raw, err := os.ReadFile(l.configPath)
 	if err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		return cfg, fmt.Errorf("read config: %w", err)
 	}
 
 	var tree map[string]any
 	if err := yaml.Unmarshal(raw, &tree); err != nil {
-		return Config{}, fmt.Errorf("parse config: %w", err)
+		return cfg, fmt.Errorf("parse config: %w", err)
 	}
 
 	var missing []string
@@ -79,17 +92,8 @@ func Load(opts ...Option) (Config, error) {
 		slices.Sort(missing)
 		missing = slices.Compact(missing)
 
-		return Config{}, fmt.Errorf("config: unresolved references: %s", strings.Join(missing, ", "))
+		return cfg, fmt.Errorf("config: unresolved references: %s", strings.Join(missing, ", "))
 	}
 
-	cfg, err := decode(tree)
-	if err != nil {
-		return Config{}, err
-	}
-
-	if err := cfg.validate(); err != nil {
-		return Config{}, fmt.Errorf("validate config: %w", err)
-	}
-
-	return cfg, nil
+	return decode[T](tree)
 }
