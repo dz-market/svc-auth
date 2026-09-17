@@ -1,0 +1,45 @@
+package opaque
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+)
+
+const MinLength = 32
+
+type Options struct {
+	Length int
+}
+
+type Generator struct {
+	length int
+}
+
+func New(opts Options) (*Generator, error) {
+	if opts.Length < MinLength {
+		return nil, fmt.Errorf("length %d is below minimum %d", opts.Length, MinLength)
+	}
+
+	return &Generator{
+		length: opts.Length,
+	}, nil
+}
+
+func (g *Generator) Generate() (string, []byte, error) {
+	buf := make([]byte, g.length)
+	if _, err := rand.Read(buf); err != nil {
+		return "", nil, fmt.Errorf("read random: %w", err)
+	}
+
+	value := base64.RawURLEncoding.EncodeToString(buf)
+
+	return value, g.Fingerprint(value), nil
+}
+
+func (g *Generator) Fingerprint(value string) []byte {
+	sum := sha256.Sum256([]byte(value))
+
+	return sum[:]
+}
