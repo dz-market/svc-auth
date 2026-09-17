@@ -27,5 +27,6 @@ func expiresIn(expiresAt, now time.Time) int32 {
 		return 0
 	}
 
+	//nolint:gosec // bounded by the configured TTLs
 	return int32(expiresAt.Sub(now).Round(time.Second) / time.Second)
 }

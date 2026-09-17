@@ -18,7 +18,10 @@ func With(ctx context.Context, attrs ...slog.Attr) context.Context {
 }
 
 func attrsFrom(ctx context.Context) []slog.Attr {
-	attrs, _ := ctx.Value(ctxKey{}).([]slog.Attr)
+	attrs, ok := ctx.Value(ctxKey{}).([]slog.Attr)
+	if !ok {
+		return nil
+	}
 
 	return attrs
 }

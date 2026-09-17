@@ -27,13 +27,14 @@ func New(opts Options) (*Generator, error) {
 	}, nil
 }
 
-func (g *Generator) Generate() (string, []byte, error) {
+func (g *Generator) Generate() (value string, fingerprint []byte, err error) {
+	//nolint:makezero // rand.Read fills the slice by its length; a zero-length one would read no bytes
 	buf := make([]byte, g.length)
 	if _, err := rand.Read(buf); err != nil {
 		return "", nil, fmt.Errorf("read random: %w", err)
 	}
 
-	value := base64.RawURLEncoding.EncodeToString(buf)
+	value = base64.RawURLEncoding.EncodeToString(buf)
 
 	return value, g.Fingerprint(value), nil
 }
