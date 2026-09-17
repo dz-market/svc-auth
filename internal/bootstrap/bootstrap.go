@@ -2,18 +2,29 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
+	"buf.build/go/protovalidate"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/config"
+	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
 	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
+	"github.com/dz-market/svc-auth/internal/infrastructure/security/argon2id"
+	"github.com/dz-market/svc-auth/internal/infrastructure/security/jwt"
+	"github.com/dz-market/svc-auth/internal/infrastructure/security/opaque"
 )
-
-const serviceName = "svc-auth"
 
 func Run(ctx context.Context, version string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -28,20 +39,24 @@ func Run(ctx context.Context, version string) error {
 		logger.Options{
 			Level:   cfg.Log.Level,
 			Format:  logger.Format(cfg.Log.Format),
-			Service: serviceName,
+			Service: cfg.ServiceName,
 			Version: version,
 		},
 	)
 
-	monitor := health.New(
-		health.Options{
-			Period:  cfg.Health.Period,
-			Timeout: cfg.Health.Timeout,
-		}, log,
+	log.DebugContext(ctx, "configuration loaded")
+
+	log.InfoContext(
+		ctx, "service starting",
+		slog.String("go_version", runtime.Version()),
+		slog.Int("pid", os.Getpid()),
+		slog.String("grpc_addr", cfg.GRPC.Addr),
+		slog.String("log_level", cfg.Log.Level.String()),
 	)
 
 	db, err := postgres.New(
 		ctx, postgres.Options{
+			AppName:           cfg.ServiceName,
 			DSN:               cfg.Postgres.DSN,
 			MaxConns:          cfg.Postgres.MaxConns,
 			MinConns:          cfg.Postgres.MinConns,
@@ -58,35 +73,127 @@ func Run(ctx context.Context, version string) error {
 
 	defer db.Close()
 
-	monitor.Register("postgres", db)
+	key, err := jwt.LoadKeyPair(cfg.Auth.Access.PrivateKeyPath, cfg.Auth.Access.PublicKeyPath)
+	if err != nil {
+		return fmt.Errorf("load access key: %w", err)
+	}
+
+	log.InfoContext(
+		ctx, "access key loaded",
+		slog.String("kid", key.ID),
+	)
+
+	accessTokenIssuer, err := jwt.NewIssuer(
+		jwt.IssuerOptions{
+			Key:      key,
+			Issuer:   cfg.Auth.Access.Issuer,
+			Audience: cfg.Auth.Access.Audience,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("access token issuer: %w", err)
+	}
+
+	refreshTokenGenerator, err := opaque.New(
+		opaque.Options{
+			Length: cfg.Auth.Refresh.Length,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("refresh token generator: %w", err)
+	}
+
+	hasher, err := argon2id.New(
+		argon2id.Params{
+			MemoryKiB:   cfg.Auth.Password.Argon2ID.MemoryKiB,
+			Iterations:  cfg.Auth.Password.Argon2ID.Iterations,
+			Parallelism: cfg.Auth.Password.Argon2ID.Parallelism,
+			SaltLength:  cfg.Auth.Password.Argon2ID.SaltLength,
+			KeyLength:   cfg.Auth.Password.Argon2ID.KeyLength,
+			MaxInFlight: cfg.Auth.Password.Argon2ID.MaxInFlight,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("password hasher: %w", err)
+	}
+
+	uow := postgres.NewUnitOfWork(
+		db, func(q postgres.Querier) auth.Repositories {
+			return auth.Repositories{
+				Users:         postgres.NewUserRepository(q),
+				RefreshTokens: postgres.NewRefreshTokenRepository(q),
+				Sessions:      postgres.NewSessionRepository(q),
+			}
+		},
+	)
+
+	authService := auth.New(
+		auth.Options{
+			UoW:               uow,
+			Hasher:            hasher,
+			AccessTokenIssuer: accessTokenIssuer,
+			RefreshGenerator:  refreshTokenGenerator,
+			AccessTokenTTL:    cfg.Auth.Access.TTL,
+			SessionTTL:        cfg.Auth.Session.TTL,
+			Log:               log,
+		},
+	)
+
+	checker := health.New(log, cfg.Health.Timeout)
+	checker.Register("postgres", db.Ping)
+
+	validator, err := protovalidate.New()
+	if err != nil {
+		return fmt.Errorf("protovalidate: %w", err)
+	}
 
 	srv := server.New(
 		server.Options{
 			Addr:       cfg.GRPC.Addr,
 			Reflection: cfg.GRPC.Reflection,
+			Validator:  validator,
 		},
 		log,
 	)
 
-	monitor.OnChange(srv.SetServing)
+	authv1.RegisterAuthServiceServer(srv.Registrar(), handler.NewAuth(authService, log))
 
-	go monitor.Run(ctx)
+	g, ctx := errgroup.WithContext(ctx)
 
-	errCh := make(chan error, 1)
+	g.Go(
+		func() error {
+			return checker.Run(
+				ctx, cfg.Health.Period, func(healthy bool) {
+					log.WarnContext(
+						ctx, "health state changed",
+						slog.Bool("healthy", healthy),
+					)
+				},
+			)
+		},
+	)
 
-	go func() {
-		errCh <- srv.Serve(ctx)
-	}()
+	g.Go(
+		func() error {
+			return srv.Serve(ctx)
+		},
+	)
 
-	select {
-	case err := <-errCh:
-		return fmt.Errorf("grpc server: %w", err)
+	g.Go(
+		func() error {
+			<-ctx.Done()
 
-	case <-ctx.Done():
-		log.InfoContext(ctx, "shutdown requested")
+			log.InfoContext(ctx, "shutdown requested")
+			srv.Shutdown(ctx, cfg.ShutdownTimeout)
+			log.InfoContext(ctx, "service stopped")
+
+			return nil
+		},
+	)
+
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		return err
 	}
-
-	srv.Shutdown(ctx, cfg.ShutdownTimeout)
 
 	return nil
 }
