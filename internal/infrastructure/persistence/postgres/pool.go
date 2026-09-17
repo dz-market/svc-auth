@@ -59,11 +59,11 @@ func New(ctx context.Context, opts Options, log *slog.Logger) (*DB, error) {
 
 	log.InfoContext(
 		ctx, "postgres connected",
-		"host", cfg.ConnConfig.Host,
-		"port", cfg.ConnConfig.Port,
-		"database", cfg.ConnConfig.Database,
-		"user", cfg.ConnConfig.User,
-		"max_conns", cfg.MaxConns,
+		slog.String("host", cfg.ConnConfig.Host),
+		slog.Int("port", int(cfg.ConnConfig.Port)),
+		slog.String("database", cfg.ConnConfig.Database),
+		slog.String("user", cfg.ConnConfig.User),
+		slog.Int("max_conns", int(cfg.MaxConns)),
 	)
 
 	return db, nil
