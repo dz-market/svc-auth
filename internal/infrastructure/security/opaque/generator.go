@@ -7,8 +7,6 @@ import (
 	"fmt"
 )
 
-const MinLength = 32
-
 type Options struct {
 	Length int
 }
@@ -18,10 +16,6 @@ type Generator struct {
 }
 
 func New(opts Options) (*Generator, error) {
-	if opts.Length < MinLength {
-		return nil, fmt.Errorf("length %d is below minimum %d", opts.Length, MinLength)
-	}
-
 	return &Generator{
 		length: opts.Length,
 	}, nil
