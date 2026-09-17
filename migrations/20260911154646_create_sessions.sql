@@ -3,10 +3,8 @@ CREATE TABLE sessions
 (
     id uuid PRIMARY KEY,
     user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-
-    created_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL,
     expires_at timestamptz NOT NULL,
-
     revoked_at timestamptz
 );
 
