@@ -23,3 +23,7 @@ func (b ByteSize) KiB() uint32 {
 	//nolint:gosec // bounded by the maxsize validation on the config field
 	return uint32(b / units.KiB)
 }
+
+func (b ByteSize) Bytes() int {
+	return int(b)
+}

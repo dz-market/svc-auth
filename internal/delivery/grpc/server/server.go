@@ -17,12 +17,13 @@ import (
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server/interceptor"
 )
 
-const maxRecvMsgSize = 1 << 20
-
 type Options struct {
-	Addr       string
-	Reflection bool
-	Validator  protovalidate.Validator
+	Addr                  string
+	Reflection            bool
+	MaxRecvMsgSize        int
+	MaxConnectionAge      time.Duration
+	MaxConnectionAgeGrace time.Duration
+	Validator             protovalidate.Validator
 }
 
 type Server struct {
@@ -42,11 +43,11 @@ func New(opts Options, log *slog.Logger) *Server {
 		),
 		grpc.KeepaliveParams(
 			keepalive.ServerParameters{
-				MaxConnectionAge:      30 * time.Minute,
-				MaxConnectionAgeGrace: 10 * time.Minute,
+				MaxConnectionAge:      opts.MaxConnectionAge,
+				MaxConnectionAgeGrace: opts.MaxConnectionAgeGrace,
 			},
 		),
-		grpc.MaxRecvMsgSize(maxRecvMsgSize),
+		grpc.MaxRecvMsgSize(opts.MaxRecvMsgSize),
 	)
 
 	healthSrv := health.NewServer()
