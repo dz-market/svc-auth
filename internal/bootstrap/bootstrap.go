@@ -11,8 +11,9 @@ import (
 	"syscall"
 
 	"buf.build/go/protovalidate"
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
 	"golang.org/x/sync/errgroup"
+
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/config"
