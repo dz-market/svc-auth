@@ -19,6 +19,7 @@ import (
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
+	"github.com/dz-market/svc-auth/internal/infrastructure/clock"
 	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
@@ -115,6 +116,8 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
+	systemClock := clock.System{}
+
 	uow := postgres.NewUnitOfWork(
 		db, func(q postgres.Querier) auth.Repositories {
 			return auth.Repositories{
@@ -131,6 +134,7 @@ func Run(ctx context.Context, version string) error {
 			Hasher:            hasher,
 			AccessTokenIssuer: accessTokenIssuer,
 			RefreshGenerator:  refreshTokenGenerator,
+			Clock:             systemClock,
 			AccessTokenTTL:    cfg.Auth.Access.TTL,
 			SessionTTL:        cfg.Auth.Session.TTL,
 			Log:               log,
@@ -157,7 +161,15 @@ func Run(ctx context.Context, version string) error {
 		log,
 	)
 
-	authv1.RegisterAuthServiceServer(srv.Registrar(), handler.NewAuth(authService, log))
+	authv1.RegisterAuthServiceServer(
+		srv.Registrar(), handler.NewAuth(
+			handler.Options{
+				Service: authService,
+				Clock:   systemClock,
+				Log:     log,
+			},
+		),
+	)
 
 	g, ctx := errgroup.WithContext(ctx)
 

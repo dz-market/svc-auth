@@ -9,6 +9,10 @@ import (
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
+type Clock interface {
+	Now() time.Time
+}
+
 type UsersRepository interface {
 	Create(ctx context.Context, u user.User) error
 }
