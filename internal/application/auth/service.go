@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -101,6 +102,65 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 	)
 
 	return RegisterOutput{
+		Access:  issued.access,
+		Refresh: issued.refresh,
+	}, nil
+}
+
+type LoginInput struct {
+	Email    string
+	Password string
+}
+
+type LoginOutput struct {
+	Access  Token
+	Refresh Token
+}
+
+func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error) {
+	now := s.clock.Now()
+
+	u, err := s.repos.Users.ByEmail(ctx, user.NormalizeEmail(in.Email))
+	if err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			return LoginOutput{}, user.ErrInvalidCredentials
+		}
+
+		return LoginOutput{}, fmt.Errorf("find user: %w", err)
+	}
+
+	match, err := s.hasher.Verify(ctx, in.Password, u.PasswordHash)
+	if err != nil {
+		return LoginOutput{}, fmt.Errorf("verify password: %w", err)
+	}
+
+	if !match {
+		return LoginOutput{}, user.ErrInvalidCredentials
+	}
+
+	issued, err := s.issueSession(u.ID, now)
+	if err != nil {
+		return LoginOutput{}, err
+	}
+
+	if err := s.uow.Do(
+		ctx, func(r Repositories) error {
+			if err := r.Sessions.Create(ctx, issued.session); err != nil {
+				return err
+			}
+
+			return r.RefreshTokens.Create(ctx, issued.refreshToken)
+		},
+	); err != nil {
+		return LoginOutput{}, err
+	}
+
+	s.log.InfoContext(
+		ctx, "user logged in",
+		slog.String("user_id", u.ID.String()),
+	)
+
+	return LoginOutput{
 		Access:  issued.access,
 		Refresh: issued.refresh,
 	}, nil
