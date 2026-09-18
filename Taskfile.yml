@@ -27,6 +27,11 @@ tasks:
         cmds:
             - go fix ./...
 
+    mocks:
+        desc: Generate mocks
+        cmds:
+            - go tool mockery
+
     migrate:create:
         desc: "Create a migration: task migrate:create -- init"
         cmds:
