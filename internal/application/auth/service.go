@@ -12,6 +12,7 @@ import (
 )
 
 type Options struct {
+	Repos             Repositories
 	UoW               UnitOfWork
 	Hasher            PasswordHasher
 	AccessTokenIssuer AccessTokenIssuer
@@ -23,6 +24,7 @@ type Options struct {
 }
 
 type Service struct {
+	repos                 Repositories
 	uow                   UnitOfWork
 	hasher                PasswordHasher
 	accessTokenIssuer     AccessTokenIssuer
@@ -35,6 +37,7 @@ type Service struct {
 
 func New(opts Options) *Service {
 	return &Service{
+		repos:                 opts.Repos,
 		uow:                   opts.UoW,
 		hasher:                opts.Hasher,
 		accessTokenIssuer:     opts.AccessTokenIssuer,
