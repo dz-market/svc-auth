@@ -54,7 +54,7 @@ func (h *Auth) Register(ctx context.Context, req *authv1.RegisterRequest) (*auth
 func (h *Auth) toStatus(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, user.ErrEmailTaken):
-		return status.Error(codes.AlreadyExists, "email is already registered")
+		return status.Error(codes.AlreadyExists, user.ErrEmailTaken.Error())
 
 	default:
 		h.log.ErrorContext(
