@@ -1,9 +1,2 @@
+duration: 10s
 unknown: value
-
-shutdown_timeout: 10s
-
-grpc:
-    addr: ":50051"
-
-log:
-    format: json
