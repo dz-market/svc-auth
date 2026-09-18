@@ -3,70 +3,93 @@ package config
 import (
 	"log/slog"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
 
-func noLookup(string) (string, bool) { return "", false }
-
-func TestLoadDefaults(t *testing.T) {
-	t.Parallel()
-
-	cfg, err := Load(
-		WithPath(filepath.Join("testdata", "config.yml")),
-		withLookup(noLookup),
-	)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-
-	want := Config{
-		ShutdownTimeout: 10 * time.Second,
-		GRPC:            GRPC{Addr: ":50051", Reflection: false},
-		Postgres:        Postgres{DSN: "postgres-dsn"},
-		Health:          Health{Period: 5 * time.Second, Timeout: 2 * time.Second},
-		Log:             Log{Level: slog.LevelInfo, Format: "json"},
-	}
-
-	if cfg != want {
-		t.Errorf("Load() = %+v, want %+v", cfg, want)
-	}
+type testConfig struct {
+	Duration time.Duration `yaml:"duration"`
+	Nested   testNested    `yaml:"nested"`
 }
 
-func TestLoadOverridesDefaults(t *testing.T) {
-	t.Parallel()
+type testNested struct {
+	String string     `yaml:"string"`
+	Bool   bool       `yaml:"bool"`
+	Level  slog.Level `yaml:"level"`
+	List   []string   `yaml:"list"`
+}
 
-	lookup := func(name string) (string, bool) {
-		v, ok := map[string]string{
-			"SHUTDOWN_TIMEOUT": "30s",
-			"GRPC_ADDR":        ":50052",
-			"GRPC_REFLECTION":  "true",
-			"LOG_LEVEL":        "debug",
-			"LOG_FORMAT":       "text",
-		}[name]
+func noLookup(string) (string, bool) {
+	return "", false
+}
+
+func lookupFrom(vars map[string]string) lookupFunc {
+	return func(name string) (string, bool) {
+		v, ok := vars[name]
 
 		return v, ok
 	}
+}
 
-	cfg, err := Load(
-		WithPath(filepath.Join("testdata", "config.yml")),
-		withLookup(lookup),
-	)
+func testdataFile(name string) Option {
+	return WithPath(filepath.Join("testdata", name))
+}
+
+func TestLoadAppliesDefaults(t *testing.T) {
+	t.Parallel()
+
+	got, err := load[testConfig](testdataFile("valid.yml"), withLookup(noLookup))
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf("load: %v", err)
 	}
 
-	want := Config{
-		ShutdownTimeout: 30 * time.Second,
-		GRPC:            GRPC{Addr: ":50052", Reflection: true},
-		Postgres:        Postgres{DSN: "postgres-dsn"},
-		Health:          Health{Period: 5 * time.Second, Timeout: 2 * time.Second},
-		Log:             Log{Level: slog.LevelDebug, Format: "text"},
+	want := testConfig{
+		Duration: 10 * time.Second,
+		Nested: testNested{
+			String: "value",
+			Bool:   false,
+			Level:  slog.LevelInfo,
+			List:   []string{"a", "b"},
+		},
 	}
 
-	if cfg != want {
-		t.Errorf("Load() = %+v, want %+v", cfg, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("load() = %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadPrefersLookupOverDefaults(t *testing.T) {
+	t.Parallel()
+
+	lookup := lookupFrom(
+		map[string]string{
+			"DURATION":  "30s",
+			"STRING":    "other",
+			"BOOL":      "true",
+			"LEVEL":     "debug",
+			"LIST_ITEM": "x",
+		},
+	)
+
+	got, err := load[testConfig](testdataFile("valid.yml"), withLookup(lookup))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	want := testConfig{
+		Duration: 30 * time.Second,
+		Nested: testNested{
+			String: "other",
+			Bool:   true,
+			Level:  slog.LevelDebug,
+			List:   []string{"x", "b"},
+		},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("load() = %+v, want %+v", got, want)
 	}
 }
 
@@ -81,11 +104,10 @@ func TestLoadErrors(t *testing.T) {
 		{name: "no such file", file: "absent.yml", wantText: "read config"},
 		{name: "malformed yaml", file: "broken.yml", wantText: "parse config"},
 		{name: "unknown key", file: "unknown.yml", wantText: "decode config"},
-		{name: "required field missing", file: "incomplete.yml", wantText: "validate config"},
 		{
 			name:     "unresolved references",
 			file:     "unresolved.yml",
-			wantText: "unresolved references: GRPC_ADDR, LOG_FORMAT",
+			wantText: "unresolved references: DURATION, STRING",
 		},
 	}
 
@@ -94,16 +116,13 @@ func TestLoadErrors(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				_, err := Load(
-					WithPath(filepath.Join("testdata", tt.file)),
-					withLookup(noLookup),
-				)
+				_, err := load[testConfig](testdataFile(tt.file), withLookup(noLookup))
 				if err == nil {
-					t.Fatal("Load() want error, got nil")
+					t.Fatal("load() want error, got nil")
 				}
 
 				if !strings.Contains(err.Error(), tt.wantText) {
-					t.Errorf("Load() error = %q, want it to contain %q", err, tt.wantText)
+					t.Errorf("load() error = %q, want it to contain %q", err, tt.wantText)
 				}
 			},
 		)
@@ -111,17 +130,29 @@ func TestLoadErrors(t *testing.T) {
 }
 
 func TestLoadReadsEnvFile(t *testing.T) {
-	path := writeEnv(t, "GRPC_ADDR=:50052")
+	t.Parallel()
 
-	cfg, err := Load(
-		WithPath(filepath.Join("testdata", "config.yml")),
-		WithEnvPath(path),
-	)
+	path := writeEnv(t, "STRING=from-file")
+
+	got, err := load[testConfig](testdataFile("valid.yml"), WithEnvPath(path))
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf("load: %v", err)
 	}
 
-	if cfg.GRPC.Addr != ":50052" {
-		t.Errorf("GRPC.Addr = %q, want = %q", cfg.GRPC.Addr, ":50052")
+	if got.Nested.String != "from-file" {
+		t.Errorf("Nested.String = %q, want = %q", got.Nested.String, "from-file")
+	}
+}
+
+func TestLoadValidates(t *testing.T) {
+	t.Parallel()
+
+	_, err := Load(testdataFile("empty.yml"), withLookup(noLookup))
+	if err == nil {
+		t.Fatal("Load() want error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "validate config") {
+		t.Errorf("Load() error = %q, want it to contain %q", err, "validate config")
 	}
 }

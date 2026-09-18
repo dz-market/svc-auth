@@ -1,0 +1,24 @@
+all: false
+generate: true
+include-auto-generated: false
+
+dir: '{{.InterfaceDir}}/mocks'
+filename: '{{.InterfaceName | snakecase}}.go'
+force-file-write: true
+
+pkgname: mocks
+structname: 'Mock{{.InterfaceName}}'
+
+template: testify
+template-schema: '{{.Template}}.schema.json'
+require-template-schema-exists: true
+
+formatter: goimports
+
+log-level: info
+
+packages:
+    github.com/dz-market/svc-auth/internal/application:
+        config:
+            recursive: true
+            all: true

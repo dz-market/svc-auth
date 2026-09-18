@@ -47,3 +47,13 @@ tasks:
         desc: Roll back last migration
         cmds:
             - goose -dir {{.MIGRATIONS_DIR}} postgres "$POSTGRES_DSN" down
+
+    keys:
+        desc: Generate RSA keypair for signing access tokens (RS256)
+        status:
+            - test -f .keys/access.key
+        cmds:
+            - mkdir -p .keys
+            - openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out .keys/access.key
+            - chmod 600 .keys/access.key
+            - openssl pkey -in .keys/access.key -pubout -out .keys/access.pub

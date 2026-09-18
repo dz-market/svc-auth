@@ -1,0 +1,7 @@
+duration: ${DURATION:-10s}
+
+nested:
+    string: ${STRING:-value}
+    bool: ${BOOL:-false}
+    level: ${LEVEL:-info}
+    list: ["${LIST_ITEM:-a}", "b"]

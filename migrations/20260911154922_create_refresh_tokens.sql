@@ -3,10 +3,8 @@ CREATE TABLE refresh_tokens
 (
     id uuid PRIMARY KEY,
     session_id uuid NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
-
     token_hash bytea NOT NULL UNIQUE,
-
-    issued_at timestamptz NOT NULL DEFAULT now(),
+    issued_at timestamptz NOT NULL,
     used_at timestamptz
 );
 

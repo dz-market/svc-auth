@@ -7,15 +7,23 @@ import (
 	"net"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
+
+	"github.com/dz-market/svc-auth/internal/delivery/grpc/server/interceptor"
 )
 
 type Options struct {
-	Addr       string
-	Reflection bool
+	Addr                  string
+	Reflection            bool
+	MaxRecvMsgSize        int
+	MaxConnectionAge      time.Duration
+	MaxConnectionAgeGrace time.Duration
+	Validator             protovalidate.Validator
 }
 
 type Server struct {
@@ -26,13 +34,28 @@ type Server struct {
 }
 
 func New(opts Options, log *slog.Logger) *Server {
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptor.Recovery(log),
+			interceptor.RequestID(),
+			interceptor.Logging(log),
+			interceptor.Validate(opts.Validator),
+		),
+		grpc.KeepaliveParams(
+			keepalive.ServerParameters{
+				MaxConnectionAge:      opts.MaxConnectionAge,
+				MaxConnectionAgeGrace: opts.MaxConnectionAgeGrace,
+			},
+		),
+		grpc.MaxRecvMsgSize(opts.MaxRecvMsgSize),
+	)
 
 	healthSrv := health.NewServer()
 	healthpb.RegisterHealthServer(srv, healthSrv)
 
 	if opts.Reflection {
 		reflection.Register(srv)
+
 		log.Warn("grpc reflection is enabled")
 	}
 
@@ -54,7 +77,10 @@ func (s *Server) Serve(ctx context.Context) error {
 
 	s.health.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
-	s.log.InfoContext(ctx, "grpc server listening", slog.String("addr", s.addr))
+	s.log.InfoContext(
+		ctx, "grpc server listening",
+		slog.String("addr", s.addr),
+	)
 
 	if err := s.grpc.Serve(lis); err != nil {
 		return fmt.Errorf("serve: %w", err)
@@ -81,18 +107,15 @@ func (s *Server) Shutdown(ctx context.Context, timeout time.Duration) {
 		s.log.InfoContext(ctx, "grpc server stopped gracefully")
 
 	case <-ctx.Done():
-		s.log.WarnContext(ctx, "grpc server did not drain in time, forcing stop", slog.Duration("timeout", timeout))
+		s.log.WarnContext(
+			ctx, "grpc server did not drain in time, forcing stop",
+			slog.Duration("timeout", timeout),
+		)
+
 		s.grpc.Stop()
 	}
 }
 
-//nolint:revive // the signature must match health.Notifier to be passed as a callback
-func (s *Server) SetServing(healthy bool) {
-	status := healthpb.HealthCheckResponse_NOT_SERVING
-
-	if healthy {
-		status = healthpb.HealthCheckResponse_SERVING
-	}
-
-	s.health.SetServingStatus("", status)
+func (s *Server) Registrar() grpc.ServiceRegistrar {
+	return s.grpc
 }

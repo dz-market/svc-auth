@@ -1,8 +1,13 @@
+service_name: svc-auth
 shutdown_timeout: 10s
 
 grpc:
     addr: "${GRPC_ADDR}"
     reflection: "${GRPC_REFLECTION:-false}"
+    max_recv_msg_size: 1MB
+    keepalive:
+        max_connection_age: 30m
+        max_connection_age_grace: 10m
 
 postgres:
     dsn: "${POSTGRES_DSN}"
@@ -13,6 +18,26 @@ postgres:
     health_check_period: 1m
     connect_timeout: 5s
     ping_timeout: 2s
+
+auth:
+    access:
+        ttl: 15m
+        issuer: svc-auth
+        audience: [marketplace]
+        private_key_path: "${ACCESS_PRIVATE_KEY_PATH}"
+        public_key_path: "${ACCESS_PUBLIC_KEY_PATH}"
+    refresh:
+        length: 32
+    session:
+        ttl: 720h
+    password:
+        argon2id:
+            memory: 19MB
+            iterations: 2
+            parallelism: 1
+            salt_length: 16
+            key_length: 32
+            max_in_flight: 8
 
 health:
     period: 5s
