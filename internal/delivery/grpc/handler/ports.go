@@ -13,4 +13,5 @@ type Clock interface {
 
 type AuthService interface {
 	Register(ctx context.Context, in auth.RegisterInput) (auth.RegisterOutput, error)
+	Login(ctx context.Context, in auth.LoginInput) (auth.LoginOutput, error)
 }

@@ -51,10 +51,27 @@ func (h *Auth) Register(ctx context.Context, req *authv1.RegisterRequest) (*auth
 	return mapper.ToRegisterResponse(out, h.clock.Now()), nil
 }
 
+func (h *Auth) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
+	out, err := h.service.Login(
+		ctx, auth.LoginInput{
+			Email:    req.GetEmail(),
+			Password: req.GetPassword(),
+		},
+	)
+	if err != nil {
+		return nil, h.toStatus(ctx, err)
+	}
+
+	return mapper.ToLoginResponse(out, h.clock.Now()), nil
+}
+
 func (h *Auth) toStatus(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, user.ErrEmailTaken):
 		return status.Error(codes.AlreadyExists, user.ErrEmailTaken.Error())
+
+	case errors.Is(err, user.ErrInvalidCredentials):
+		return status.Error(codes.Unauthenticated, user.ErrInvalidCredentials.Error())
 
 	default:
 		h.log.ErrorContext(
