@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/dz-market/svc-auth/internal/domain/user"
@@ -36,4 +37,26 @@ func (r *UserRepository) Create(ctx context.Context, u user.User) error {
 	}
 
 	return nil
+}
+
+func (r *UserRepository) ByEmail(ctx context.Context, email string) (user.User, error) {
+	const query = `
+		SELECT id, email, password_hash, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+
+	var u user.User
+
+	if err := r.q.
+		QueryRow(ctx, query, email).
+		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return user.User{}, user.ErrNotFound
+		}
+
+		return user.User{}, fmt.Errorf("get user by email: %w", err)
+	}
+
+	return u, nil
 }
