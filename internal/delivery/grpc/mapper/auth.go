@@ -15,6 +15,13 @@ func ToRegisterResponse(out auth.RegisterOutput, now time.Time) *authv1.Register
 	}.Build()
 }
 
+func ToLoginResponse(out auth.LoginOutput, now time.Time) *authv1.LoginResponse {
+	return authv1.LoginResponse_builder{
+		Access:  ToToken(out.Access, now),
+		Refresh: ToToken(out.Refresh, now),
+	}.Build()
+}
+
 func ToToken(t auth.Token, now time.Time) *authv1.Token {
 	return authv1.Token_builder{
 		Token:     new(t.Value),
