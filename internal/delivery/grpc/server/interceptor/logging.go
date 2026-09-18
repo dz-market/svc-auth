@@ -28,13 +28,15 @@ func slogAdapter(log *slog.Logger) logging.Logger {
 
 func codeToLevel(code codes.Code) logging.Level {
 	switch code {
-	case codes.OK:
+	case codes.OK, codes.NotFound, codes.Canceled, codes.AlreadyExists,
+		codes.InvalidArgument, codes.Unauthenticated:
 		return logging.LevelInfo
 
-	case codes.Internal, codes.Unknown, codes.DataLoss, codes.Unavailable:
-		return logging.LevelError
+	case codes.DeadlineExceeded, codes.PermissionDenied, codes.ResourceExhausted,
+		codes.FailedPrecondition, codes.Aborted, codes.OutOfRange, codes.Unavailable:
+		return logging.LevelWarn
 
 	default:
-		return logging.LevelWarn
+		return logging.LevelError
 	}
 }
