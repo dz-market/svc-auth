@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/dz-market/svc-auth/internal/domain/session"
 	"github.com/dz-market/svc-auth/internal/domain/user"
@@ -45,14 +46,14 @@ func New(opts Options) *Service {
 	}
 }
 
-type RegisterInput struct {
-	Email    string
-	Password string
-}
-
 type Token struct {
 	Value     string
 	ExpiresAt time.Time
+}
+
+type RegisterInput struct {
+	Email    string
+	Password string
 }
 
 type RegisterOutput struct {
@@ -69,21 +70,11 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 	}
 
 	u := user.New(in.Email, passwordHash, now)
-	sess := session.NewSession(u.ID, s.sessionTTL, now)
 
-	accessTokenExpiresAt := now.Add(s.accessTokenTTL)
-
-	accessToken, err := s.accessTokenIssuer.Issue(u.ID, sess.ID, now, accessTokenExpiresAt)
+	issued, err := s.issueSession(u.ID, now)
 	if err != nil {
-		return RegisterOutput{}, fmt.Errorf("issue access token: %w", err)
+		return RegisterOutput{}, err
 	}
-
-	refreshTokenValue, refreshTokenHash, err := s.refreshTokenGenerator.Generate()
-	if err != nil {
-		return RegisterOutput{}, fmt.Errorf("issue refresh token: %w", err)
-	}
-
-	rt := session.NewRefreshToken(sess.ID, refreshTokenHash, now)
 
 	if err := s.uow.Do(
 		ctx, func(r Repositories) error {
@@ -91,11 +82,11 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 				return err
 			}
 
-			if err := r.Sessions.Create(ctx, sess); err != nil {
+			if err := r.Sessions.Create(ctx, issued.session); err != nil {
 				return err
 			}
 
-			return r.RefreshTokens.Create(ctx, rt)
+			return r.RefreshTokens.Create(ctx, issued.refreshToken)
 		},
 	); err != nil {
 		return RegisterOutput{}, err
@@ -107,11 +98,41 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 	)
 
 	return RegisterOutput{
-		Access: Token{
-			Value:     accessToken,
+		Access:  issued.access,
+		Refresh: issued.refresh,
+	}, nil
+}
+
+type issuedSession struct {
+	session      session.Session
+	refreshToken session.RefreshToken
+	access       Token
+	refresh      Token
+}
+
+func (s *Service) issueSession(userID uuid.UUID, now time.Time) (issuedSession, error) {
+	sess := session.NewSession(userID, s.sessionTTL, now)
+
+	accessTokenExpiresAt := now.Add(s.accessTokenTTL)
+
+	accessTokenValue, err := s.accessTokenIssuer.Issue(userID, sess.ID, now, accessTokenExpiresAt)
+	if err != nil {
+		return issuedSession{}, fmt.Errorf("issue access token: %w", err)
+	}
+
+	refreshTokenValue, refreshTokenHash, err := s.refreshTokenGenerator.Generate()
+	if err != nil {
+		return issuedSession{}, fmt.Errorf("generate refresh token: %w", err)
+	}
+
+	return issuedSession{
+		session:      sess,
+		refreshToken: session.NewRefreshToken(sess.ID, refreshTokenHash, now),
+		access: Token{
+			Value:     accessTokenValue,
 			ExpiresAt: accessTokenExpiresAt,
 		},
-		Refresh: Token{
+		refresh: Token{
 			Value:     refreshTokenValue,
 			ExpiresAt: sess.ExpiresAt,
 		},
