@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -75,6 +77,18 @@ func (d *DB) Ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (d *DB) Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
+	return d.pool.Exec(ctx, query, args...)
+}
+
+func (d *DB) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
+	return d.pool.Query(ctx, query, args...)
+}
+
+func (d *DB) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
+	return d.pool.QueryRow(ctx, query, args...)
 }
 
 func (d *DB) Close() {

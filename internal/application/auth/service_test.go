@@ -68,8 +68,15 @@ func newTestService(t *testing.T) testService {
 		uow:       mocks.NewMockUnitOfWork(t),
 	}
 
+	repos := auth.Repositories{
+		Users:         s.users,
+		RefreshTokens: s.tokens,
+		Sessions:      s.sessions,
+	}
+
 	s.service = auth.New(
 		auth.Options{
+			Repos:             repos,
 			UoW:               s.uow,
 			Hasher:            s.hasher,
 			AccessTokenIssuer: s.issuer,
