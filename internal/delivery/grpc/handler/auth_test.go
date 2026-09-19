@@ -66,13 +66,17 @@ func newTestHandler(t *testing.T) testHandler {
 }
 
 func tokens() (accessToken, refreshToken auth.Token) {
-	return auth.Token{
+	accessToken = auth.Token{
 		Value:     accessValue,
 		ExpiresAt: fixedNow.Add(accessTTL),
-	}, auth.Token{
+	}
+
+	refreshToken = auth.Token{
 		Value:     refreshValue,
 		ExpiresAt: fixedNow.Add(refreshTTL),
 	}
+
+	return accessToken, refreshToken
 }
 
 func TestHandler_Register(t *testing.T) {
