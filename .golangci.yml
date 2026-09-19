@@ -101,6 +101,10 @@ linters:
             # Default: false
             for-loops: true
 
+        modernize:
+            disable:
+                - embedlit
+
         revive:
             enable-all-rules: true
             rules:
