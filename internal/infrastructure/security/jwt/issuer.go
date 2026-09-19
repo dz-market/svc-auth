@@ -44,7 +44,6 @@ func NewIssuer(opts IssuerOptions) (*Issuer, error) {
 
 func (i *Issuer) Issue(userID, sessionID uuid.UUID, issuedAt, expiresAt time.Time) (string, error) {
 	token := jwtgo.NewWithClaims(
-		//nolint:modernize // the embedded struct is set explicitly on purpose
 		jwtgo.SigningMethodRS256, Claims{
 			SessionID: sessionID,
 			RegisteredClaims: jwtgo.RegisteredClaims{
