@@ -22,3 +22,8 @@ packages:
         config:
             recursive: true
             all: true
+
+    github.com/dz-market/svc-auth/internal/delivery/grpc/handler:
+        config:
+            recursive: true
+            all: true

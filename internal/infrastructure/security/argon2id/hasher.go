@@ -3,7 +3,7 @@ package argon2id
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
+	"crypto/subtle"
 	"fmt"
 
 	"golang.org/x/crypto/argon2"
@@ -49,6 +49,20 @@ func (h *Hasher) Hash(ctx context.Context, password string) (string, error) {
 	return encode(h.p, salt, key), nil
 }
 
+func (h *Hasher) Verify(ctx context.Context, password, passwordHash string) (bool, error) {
+	d, err := decode(passwordHash)
+	if err != nil {
+		return false, err
+	}
+
+	key, err := h.key(ctx, password, d.salt, d.params)
+	if err != nil {
+		return false, err
+	}
+
+	return subtle.ConstantTimeCompare(key, d.key) == 1, nil
+}
+
 func (h *Hasher) key(ctx context.Context, password string, salt []byte, p Params) ([]byte, error) {
 	select {
 	case h.sem <- struct{}{}:
@@ -61,13 +75,4 @@ func (h *Hasher) key(ctx context.Context, password string, salt []byte, p Params
 	}
 
 	return argon2.IDKey([]byte(password), salt, p.Iterations, p.MemoryKiB, p.Parallelism, p.KeyLength), nil
-}
-
-func encode(p Params, salt, key []byte) string {
-	return fmt.Sprintf(
-		"$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
-		argon2.Version, p.MemoryKiB, p.Iterations, p.Parallelism,
-		base64.RawStdEncoding.EncodeToString(salt),
-		base64.RawStdEncoding.EncodeToString(key),
-	)
 }

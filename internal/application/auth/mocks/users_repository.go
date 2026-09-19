@@ -47,6 +47,72 @@ func (_m *MockUsersRepository) EXPECT() *MockUsersRepository_Expecter {
 	return &MockUsersRepository_Expecter{mock: &_m.Mock}
 }
 
+// ByEmail provides a mock function for the type MockUsersRepository
+func (_mock *MockUsersRepository) ByEmail(ctx context.Context, email string) (user.User, error) {
+	ret := _mock.Called(ctx, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByEmail")
+	}
+
+	var r0 user.User
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (user.User, error)); ok {
+		return returnFunc(ctx, email)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) user.User); ok {
+		r0 = returnFunc(ctx, email)
+	} else {
+		r0 = ret.Get(0).(user.User)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, email)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockUsersRepository_ByEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByEmail'
+type MockUsersRepository_ByEmail_Call struct {
+	*mock.Call
+}
+
+// ByEmail is a helper method to define mock.On call
+//   - ctx context.Context
+//   - email string
+func (_e *MockUsersRepository_Expecter) ByEmail(ctx any, email any) *MockUsersRepository_ByEmail_Call {
+	return &MockUsersRepository_ByEmail_Call{Call: _e.mock.On("ByEmail", ctx, email)}
+}
+
+func (_c *MockUsersRepository_ByEmail_Call) Run(run func(ctx context.Context, email string)) *MockUsersRepository_ByEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockUsersRepository_ByEmail_Call) Return(user1 user.User, err error) *MockUsersRepository_ByEmail_Call {
+	_c.Call.Return(user1, err)
+	return _c
+}
+
+func (_c *MockUsersRepository_ByEmail_Call) RunAndReturn(run func(ctx context.Context, email string) (user.User, error)) *MockUsersRepository_ByEmail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function for the type MockUsersRepository
 func (_mock *MockUsersRepository) Create(ctx context.Context, u user.User) error {
 	ret := _mock.Called(ctx, u)

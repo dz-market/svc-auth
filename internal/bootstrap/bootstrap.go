@@ -118,19 +118,18 @@ func Run(ctx context.Context, version string) error {
 
 	systemClock := clock.System{}
 
-	uow := postgres.NewUnitOfWork(
-		db, func(q postgres.Querier) auth.Repositories {
-			return auth.Repositories{
-				Users:         postgres.NewUserRepository(q),
-				RefreshTokens: postgres.NewRefreshTokenRepository(q),
-				Sessions:      postgres.NewSessionRepository(q),
-			}
-		},
-	)
+	newAuthRepos := func(q postgres.Querier) auth.Repositories {
+		return auth.Repositories{
+			Users:         postgres.NewUserRepository(q),
+			RefreshTokens: postgres.NewRefreshTokenRepository(q),
+			Sessions:      postgres.NewSessionRepository(q),
+		}
+	}
 
 	authService := auth.New(
 		auth.Options{
-			UoW:               uow,
+			Repos:             newAuthRepos(db),
+			UoW:               postgres.NewUnitOfWork(db, newAuthRepos),
 			Hasher:            hasher,
 			AccessTokenIssuer: accessTokenIssuer,
 			RefreshGenerator:  refreshTokenGenerator,

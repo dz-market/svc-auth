@@ -15,6 +15,7 @@ type Clock interface {
 
 type UsersRepository interface {
 	Create(ctx context.Context, u user.User) error
+	ByEmail(ctx context.Context, email string) (user.User, error)
 }
 
 type RefreshTokensRepository interface {
@@ -27,6 +28,7 @@ type SessionsRepository interface {
 
 type PasswordHasher interface {
 	Hash(ctx context.Context, password string) (string, error)
+	Verify(ctx context.Context, password, passwordHash string) (bool, error)
 }
 
 type AccessTokenIssuer interface {
