@@ -12,6 +12,7 @@ import (
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/mapper"
+	"github.com/dz-market/svc-auth/internal/domain/session"
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
@@ -65,6 +66,19 @@ func (h *Auth) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.Log
 	return mapper.ToLoginResponse(out, h.clock.Now()), nil
 }
 
+func (h *Auth) Refresh(ctx context.Context, req *authv1.RefreshRequest) (*authv1.RefreshResponse, error) {
+	out, err := h.service.Refresh(
+		ctx, auth.RefreshInput{
+			RefreshToken: req.GetRefreshToken(),
+		},
+	)
+	if err != nil {
+		return nil, h.toStatus(ctx, err)
+	}
+
+	return mapper.ToRefreshResponse(out, h.clock.Now()), nil
+}
+
 func (h *Auth) toStatus(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, user.ErrEmailTaken):
@@ -72,6 +86,9 @@ func (h *Auth) toStatus(ctx context.Context, err error) error {
 
 	case errors.Is(err, user.ErrInvalidCredentials):
 		return status.Error(codes.Unauthenticated, user.ErrInvalidCredentials.Error())
+
+	case errors.Is(err, session.ErrInvalidRefreshToken):
+		return status.Error(codes.Unauthenticated, session.ErrInvalidRefreshToken.Error())
 
 	default:
 		h.log.ErrorContext(
