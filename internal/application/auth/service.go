@@ -166,30 +166,88 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	}, nil
 }
 
-type issuedSession struct {
-	session      session.Session
+type RefreshInput struct {
+	RefreshToken string
+}
+
+type RefreshOutput struct {
+	Access  Token
+	Refresh Token
+}
+
+func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, error) {
+	now := s.clock.Now()
+
+	rt, err := s.repos.RefreshTokens.ByHash(ctx, s.refreshTokenGenerator.Fingerprint(in.RefreshToken))
+	if err != nil {
+		if errors.Is(err, session.ErrRefreshTokenNotFound) {
+			return RefreshOutput{}, session.ErrInvalidRefreshToken
+		}
+
+		return RefreshOutput{}, fmt.Errorf("find refresh token: %w", err)
+	}
+
+	sess, err := s.repos.Sessions.ByID(ctx, rt.SessionID)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			return RefreshOutput{}, session.ErrInvalidRefreshToken
+		}
+
+		return RefreshOutput{}, fmt.Errorf("find session: %w", err)
+	}
+
+	if !sess.IsActive(now) {
+		return RefreshOutput{}, session.ErrInvalidRefreshToken
+	}
+
+	issued, err := s.issueTokens(sess, now)
+	if err != nil {
+		return RefreshOutput{}, err
+	}
+
+	if err := s.uow.Do(
+		ctx, func(r Repositories) error {
+			marked, err := r.RefreshTokens.MarkUsed(ctx, rt.ID, now)
+			if err != nil {
+				return err
+			}
+
+			if !marked {
+				return session.ErrInvalidRefreshToken
+			}
+
+			return r.RefreshTokens.Create(ctx, issued.refreshToken)
+		},
+	); err != nil {
+		return RefreshOutput{}, err
+	}
+
+	return RefreshOutput{
+		Access:  issued.access,
+		Refresh: issued.refresh,
+	}, nil
+}
+
+type issuedTokens struct {
 	refreshToken session.RefreshToken
 	access       Token
 	refresh      Token
 }
 
-func (s *Service) issueSession(userID uuid.UUID, now time.Time) (issuedSession, error) {
-	sess := session.NewSession(userID, s.sessionTTL, now)
-
+func (s *Service) issueTokens(sess session.Session, now time.Time) (issuedTokens, error) {
 	accessTokenExpiresAt := now.Add(s.accessTokenTTL)
 
-	accessTokenValue, err := s.accessTokenIssuer.Issue(userID, sess.ID, now, accessTokenExpiresAt)
+	accessTokenValue, err := s.accessTokenIssuer.Issue(sess.UserID, sess.ID, now, accessTokenExpiresAt)
 	if err != nil {
-		return issuedSession{}, fmt.Errorf("issue access token: %w", err)
+		return issuedTokens{}, fmt.Errorf("issue access token: %w", err)
 	}
 
 	refreshTokenValue, refreshTokenHash, err := s.refreshTokenGenerator.Generate()
 	if err != nil {
-		return issuedSession{}, fmt.Errorf("generate refresh token: %w", err)
+		return issuedTokens{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 
-	return issuedSession{
-		session:      sess,
+	return issuedTokens{
 		refreshToken: session.NewRefreshToken(sess.ID, refreshTokenHash, now),
 		access: Token{
 			Value:     accessTokenValue,
@@ -199,5 +257,25 @@ func (s *Service) issueSession(userID uuid.UUID, now time.Time) (issuedSession, 
 			Value:     refreshTokenValue,
 			ExpiresAt: sess.ExpiresAt,
 		},
+	}, nil
+}
+
+type issuedSession struct {
+	session session.Session
+
+	issuedTokens
+}
+
+func (s *Service) issueSession(userID uuid.UUID, now time.Time) (issuedSession, error) {
+	sess := session.NewSession(userID, s.sessionTTL, now)
+
+	tokens, err := s.issueTokens(sess, now)
+	if err != nil {
+		return issuedSession{}, err
+	}
+
+	return issuedSession{
+		session:      sess,
+		issuedTokens: tokens,
 	}, nil
 }
