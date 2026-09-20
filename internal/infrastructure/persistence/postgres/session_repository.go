@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
@@ -55,18 +54,4 @@ func (r *SessionRepository) ByID(ctx context.Context, id uuid.UUID) (session.Ses
 	}
 
 	return s, nil
-}
-
-func (r *SessionRepository) Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error {
-	const query = `
-		UPDATE sessions
-		SET revoked_at = $1
-		WHERE id = $2 AND revoked_at IS NULL
-	`
-
-	if _, err := r.q.Exec(ctx, query, revokedAt, id); err != nil {
-		return fmt.Errorf("revoke session: %w", err)
-	}
-
-	return nil
 }

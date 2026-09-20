@@ -27,7 +27,6 @@ type RefreshTokensRepository interface {
 type SessionsRepository interface {
 	Create(ctx context.Context, s session.Session) error
 	ByID(ctx context.Context, id uuid.UUID) (session.Session, error)
-	Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error
 }
 
 type PasswordHasher interface {
