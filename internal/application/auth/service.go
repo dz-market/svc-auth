@@ -99,6 +99,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 	s.log.InfoContext(
 		ctx, "user registered",
 		slog.String("user_id", u.ID.String()),
+		slog.String("session_id", issued.session.ID.String()),
 	)
 
 	return RegisterOutput{
@@ -158,6 +159,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	s.log.InfoContext(
 		ctx, "user logged in",
 		slog.String("user_id", u.ID.String()),
+		slog.String("session_id", issued.session.ID.String()),
 	)
 
 	return LoginOutput{
