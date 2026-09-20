@@ -11,6 +11,7 @@ import (
 	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
+	"github.com/dz-market/svc-auth/internal/delivery/grpc/identity"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/mapper"
 	"github.com/dz-market/svc-auth/internal/domain/session"
 	"github.com/dz-market/svc-auth/internal/domain/user"
@@ -77,6 +78,25 @@ func (h *Auth) Refresh(ctx context.Context, req *authv1.RefreshRequest) (*authv1
 	}
 
 	return mapper.ToRefreshResponse(out, h.clock.Now()), nil
+}
+
+func (h *Auth) Logout(ctx context.Context, _ *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
+	id, ok := identity.From(ctx)
+	if !ok {
+		h.log.ErrorContext(ctx, "identity is missing from the context")
+
+		return nil, status.Errorf(codes.Unauthenticated, "invalid access token")
+	}
+
+	if err := h.service.Logout(
+		ctx, auth.LogoutInput{
+			SessionID: id.SessionID,
+		},
+	); err != nil {
+		return nil, h.toStatus(ctx, err)
+	}
+
+	return authv1.LogoutResponse_builder{}.Build(), nil
 }
 
 func (h *Auth) toStatus(ctx context.Context, err error) error {
