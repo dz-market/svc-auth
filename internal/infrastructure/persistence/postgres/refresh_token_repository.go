@@ -71,3 +71,17 @@ func (r *RefreshTokenRepository) MarkUsed(ctx context.Context, id uuid.UUID, use
 
 	return tag.RowsAffected() > 0, nil
 }
+
+func (r *RefreshTokenRepository) MarkUsedBySessionID(ctx context.Context, sessionID uuid.UUID, usedAt time.Time) error {
+	const query = `
+		UPDATE refresh_tokens
+		SET used_at = $1
+		WHERE session_id = $2 AND used_at IS NULL
+	`
+
+	if _, err := r.q.Exec(ctx, query, usedAt, sessionID); err != nil {
+		return fmt.Errorf("mark refresh tokens used by session id: %w", err)
+	}
+
+	return nil
+}
