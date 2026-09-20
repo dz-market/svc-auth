@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/docker/go-units v0.5.0
-	github.com/dz-market/protobuf v0.2.1
+	github.com/dz-market/protobuf v0.2.2
 	github.com/go-playground/validator/v10 v10.30.4
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/goccy/go-yaml v1.19.2
