@@ -19,11 +19,12 @@ import (
 )
 
 const (
-	email        = "user@example.com"
-	password     = "password"
-	passwordHash = "password-hash"
-	accessValue  = "access-token"
-	refreshValue = "refresh-token"
+	email           = "user@example.com"
+	password        = "password"
+	passwordHash    = "password-hash"
+	accessValue     = "access-token"
+	refreshValue    = "refresh-token"
+	oldRefreshValue = "old-refresh-token"
 )
 
 const (
@@ -33,14 +34,29 @@ const (
 
 //nolint:gochecknoglobals // test fixtures
 var (
-	fixedNow           = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	refreshFingerprint = []byte("refresh-fingerprint")
+	fixedNow              = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	refreshFingerprint    = []byte("refresh-fingerprint")
+	oldRefreshFingerprint = []byte("old-refresh-fingerprint")
 
 	storedUser = user.User{
 		ID:           uuid.NewV7(),
 		Email:        email,
 		PasswordHash: passwordHash,
 		CreatedAt:    fixedNow,
+	}
+
+	storedSession = session.Session{
+		ID:        uuid.NewV7(),
+		UserID:    storedUser.ID,
+		CreatedAt: fixedNow,
+		ExpiresAt: fixedNow.Add(sessionTTL),
+	}
+
+	storedRefreshToken = session.RefreshToken{
+		ID:        uuid.NewV7(),
+		SessionID: storedSession.ID,
+		Hash:      oldRefreshFingerprint,
+		IssuedAt:  fixedNow,
 	}
 )
 
@@ -449,6 +465,246 @@ func TestService_Login(t *testing.T) {
 	}
 }
 
+func TestService_Refresh(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(s testService)
+		want    auth.RefreshOutput
+		wantErr error
+	}{
+		{
+			name: "success",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+				expectTokensIssued(s)
+				expectTransaction(s)
+				expectTokenMarkedUsed(s)
+				expectRefreshPersistence(s)
+			},
+			want: auth.RefreshOutput{
+				Access: auth.Token{
+					Value:     accessValue,
+					ExpiresAt: fixedNow.Add(accessTTL),
+				},
+				Refresh: auth.Token{
+					Value:     refreshValue,
+					ExpiresAt: storedSession.ExpiresAt,
+				},
+			},
+		},
+		{
+			name: "refresh token not found",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+
+				s.tokens.EXPECT().
+					ByHash(mock.Anything, oldRefreshFingerprint).
+					Return(session.RefreshToken{}, session.ErrRefreshTokenNotFound)
+			},
+			wantErr: session.ErrInvalidRefreshToken,
+		},
+		{
+			name: "find refresh token error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+
+				s.tokens.EXPECT().
+					ByHash(mock.Anything, oldRefreshFingerprint).
+					Return(session.RefreshToken{}, errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "session not found",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+
+				s.sessions.EXPECT().
+					ByID(mock.Anything, storedSession.ID).
+					Return(session.Session{}, session.ErrSessionNotFound)
+			},
+			wantErr: session.ErrInvalidRefreshToken,
+		},
+		{
+			name: "find session error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+
+				s.sessions.EXPECT().
+					ByID(mock.Anything, storedSession.ID).
+					Return(session.Session{}, errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "session revoked",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+
+				revokedAt := fixedNow
+
+				revoked := storedSession
+				revoked.RevokedAt = &revokedAt
+
+				s.sessions.EXPECT().
+					ByID(mock.Anything, storedSession.ID).
+					Return(revoked, nil)
+			},
+			wantErr: session.ErrInvalidRefreshToken,
+		},
+		{
+			name: "session expired",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+
+				expired := storedSession
+				expired.ExpiresAt = fixedNow
+
+				s.sessions.EXPECT().
+					ByID(mock.Anything, storedSession.ID).
+					Return(expired, nil)
+			},
+			wantErr: session.ErrInvalidRefreshToken,
+		},
+		{
+			name: "issue access token error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+
+				s.issuer.EXPECT().
+					Issue(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return("", errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "generate refresh token error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+				expectAccessIssue(s)
+
+				s.generator.EXPECT().
+					Generate().
+					Return("", nil, errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "transaction error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+				expectTokensIssued(s)
+
+				s.uow.EXPECT().
+					Do(mock.Anything, mock.Anything).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "mark refresh token used error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+				expectTokensIssued(s)
+				expectTransaction(s)
+
+				s.tokens.EXPECT().
+					MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
+					Return(false, errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "refresh token already used",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+				expectTokensIssued(s)
+				expectTransaction(s)
+
+				s.tokens.EXPECT().
+					MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
+					Return(false, nil)
+			},
+			wantErr: session.ErrInvalidRefreshToken,
+		},
+		{
+			name: "create refresh token error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectSessionFound(s)
+				expectTokensIssued(s)
+				expectTransaction(s)
+				expectTokenMarkedUsed(s)
+
+				s.tokens.EXPECT().
+					Create(mock.Anything, mock.Anything).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				ts := newTestService(t)
+
+				tt.setup(ts)
+
+				out, err := ts.service.Refresh(
+					t.Context(), auth.RefreshInput{
+						RefreshToken: oldRefreshValue,
+					},
+				)
+
+				if tt.wantErr != nil {
+					require.ErrorIs(t, err, tt.wantErr)
+					assert.Zero(t, out)
+
+					return
+				}
+
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, out)
+			},
+		)
+	}
+}
+
 func expectClock(s testService) {
 	s.clock.EXPECT().
 		Now().
@@ -471,6 +727,30 @@ func expectUserFound(s testService) {
 func expectPasswordMatch(s testService) {
 	s.hasher.EXPECT().
 		Verify(mock.Anything, password, passwordHash).
+		Return(true, nil)
+}
+
+func expectFingerprint(s testService) {
+	s.generator.EXPECT().
+		Fingerprint(oldRefreshValue).
+		Return(oldRefreshFingerprint)
+}
+
+func expectRefreshTokenFound(s testService) {
+	s.tokens.EXPECT().
+		ByHash(mock.Anything, oldRefreshFingerprint).
+		Return(storedRefreshToken, nil)
+}
+
+func expectSessionFound(s testService) {
+	s.sessions.EXPECT().
+		ByID(mock.Anything, storedSession.ID).
+		Return(storedSession, nil)
+}
+
+func expectTokenMarkedUsed(s testService) {
+	s.tokens.EXPECT().
+		MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
 		Return(true, nil)
 }
 
@@ -593,6 +873,22 @@ func expectLoginPersistence(s testService) {
 		RunAndReturn(
 			func(_ context.Context, rt session.RefreshToken) error {
 				assert.Equal(s.t, sessionID, rt.SessionID)
+				assert.Equal(s.t, refreshFingerprint, rt.Hash)
+				assert.Equal(s.t, fixedNow, rt.IssuedAt)
+
+				return nil
+			},
+		)
+}
+
+func expectRefreshPersistence(s testService) {
+	s.t.Helper()
+
+	s.tokens.EXPECT().
+		Create(mock.Anything, mock.Anything).
+		RunAndReturn(
+			func(_ context.Context, rt session.RefreshToken) error {
+				assert.Equal(s.t, storedSession.ID, rt.SessionID)
 				assert.Equal(s.t, refreshFingerprint, rt.Hash)
 				assert.Equal(s.t, fixedNow, rt.IssuedAt)
 

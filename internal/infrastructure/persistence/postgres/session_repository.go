@@ -2,7 +2,11 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/dz-market/svc-auth/internal/domain/session"
 )
@@ -28,4 +32,26 @@ func (r *SessionRepository) Create(ctx context.Context, s session.Session) error
 	}
 
 	return nil
+}
+
+func (r *SessionRepository) ByID(ctx context.Context, id uuid.UUID) (session.Session, error) {
+	const query = `
+		SELECT id, user_id, created_at, expires_at, revoked_at
+		FROM sessions
+		WHERE id = $1
+	`
+
+	var s session.Session
+
+	if err := r.q.
+		QueryRow(ctx, query, id).
+		Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.ExpiresAt, &s.RevokedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return session.Session{}, session.ErrSessionNotFound
+		}
+
+		return session.Session{}, fmt.Errorf("get session by id: %w", err)
+	}
+
+	return s, nil
 }

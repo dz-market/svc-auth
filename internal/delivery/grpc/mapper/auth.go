@@ -22,6 +22,13 @@ func ToLoginResponse(out auth.LoginOutput, now time.Time) *authv1.LoginResponse 
 	}.Build()
 }
 
+func ToRefreshResponse(out auth.RefreshOutput, now time.Time) *authv1.RefreshResponse {
+	return authv1.RefreshResponse_builder{
+		Access:  ToToken(out.Access, now),
+		Refresh: ToToken(out.Refresh, now),
+	}.Build()
+}
+
 func ToToken(t auth.Token, now time.Time) *authv1.Token {
 	return authv1.Token_builder{
 		Token:     new(t.Value),

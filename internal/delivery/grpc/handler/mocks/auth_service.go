@@ -113,6 +113,72 @@ func (_c *MockAuthService_Login_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// Refresh provides a mock function for the type MockAuthService
+func (_mock *MockAuthService) Refresh(ctx context.Context, in auth.RefreshInput) (auth.RefreshOutput, error) {
+	ret := _mock.Called(ctx, in)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Refresh")
+	}
+
+	var r0 auth.RefreshOutput
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, auth.RefreshInput) (auth.RefreshOutput, error)); ok {
+		return returnFunc(ctx, in)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, auth.RefreshInput) auth.RefreshOutput); ok {
+		r0 = returnFunc(ctx, in)
+	} else {
+		r0 = ret.Get(0).(auth.RefreshOutput)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, auth.RefreshInput) error); ok {
+		r1 = returnFunc(ctx, in)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockAuthService_Refresh_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Refresh'
+type MockAuthService_Refresh_Call struct {
+	*mock.Call
+}
+
+// Refresh is a helper method to define mock.On call
+//   - ctx context.Context
+//   - in auth.RefreshInput
+func (_e *MockAuthService_Expecter) Refresh(ctx any, in any) *MockAuthService_Refresh_Call {
+	return &MockAuthService_Refresh_Call{Call: _e.mock.On("Refresh", ctx, in)}
+}
+
+func (_c *MockAuthService_Refresh_Call) Run(run func(ctx context.Context, in auth.RefreshInput)) *MockAuthService_Refresh_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 auth.RefreshInput
+		if args[1] != nil {
+			arg1 = args[1].(auth.RefreshInput)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthService_Refresh_Call) Return(refreshOutput auth.RefreshOutput, err error) *MockAuthService_Refresh_Call {
+	_c.Call.Return(refreshOutput, err)
+	return _c
+}
+
+func (_c *MockAuthService_Refresh_Call) RunAndReturn(run func(ctx context.Context, in auth.RefreshInput) (auth.RefreshOutput, error)) *MockAuthService_Refresh_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Register provides a mock function for the type MockAuthService
 func (_mock *MockAuthService) Register(ctx context.Context, in auth.RegisterInput) (auth.RegisterOutput, error) {
 	ret := _mock.Called(ctx, in)

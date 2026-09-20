@@ -6,6 +6,8 @@ package mocks
 
 import (
 	"context"
+	"time"
+	"uuid"
 
 	"github.com/dz-market/svc-auth/internal/domain/session"
 	mock "github.com/stretchr/testify/mock"
@@ -45,6 +47,72 @@ type MockRefreshTokensRepository_Expecter struct {
 
 func (_m *MockRefreshTokensRepository) EXPECT() *MockRefreshTokensRepository_Expecter {
 	return &MockRefreshTokensRepository_Expecter{mock: &_m.Mock}
+}
+
+// ByHash provides a mock function for the type MockRefreshTokensRepository
+func (_mock *MockRefreshTokensRepository) ByHash(ctx context.Context, hash []byte) (session.RefreshToken, error) {
+	ret := _mock.Called(ctx, hash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByHash")
+	}
+
+	var r0 session.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte) (session.RefreshToken, error)); ok {
+		return returnFunc(ctx, hash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte) session.RefreshToken); ok {
+		r0 = returnFunc(ctx, hash)
+	} else {
+		r0 = ret.Get(0).(session.RefreshToken)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte) error); ok {
+		r1 = returnFunc(ctx, hash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRefreshTokensRepository_ByHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByHash'
+type MockRefreshTokensRepository_ByHash_Call struct {
+	*mock.Call
+}
+
+// ByHash is a helper method to define mock.On call
+//   - ctx context.Context
+//   - hash []byte
+func (_e *MockRefreshTokensRepository_Expecter) ByHash(ctx any, hash any) *MockRefreshTokensRepository_ByHash_Call {
+	return &MockRefreshTokensRepository_ByHash_Call{Call: _e.mock.On("ByHash", ctx, hash)}
+}
+
+func (_c *MockRefreshTokensRepository_ByHash_Call) Run(run func(ctx context.Context, hash []byte)) *MockRefreshTokensRepository_ByHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []byte
+		if args[1] != nil {
+			arg1 = args[1].([]byte)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRefreshTokensRepository_ByHash_Call) Return(refreshToken session.RefreshToken, err error) *MockRefreshTokensRepository_ByHash_Call {
+	_c.Call.Return(refreshToken, err)
+	return _c
+}
+
+func (_c *MockRefreshTokensRepository_ByHash_Call) RunAndReturn(run func(ctx context.Context, hash []byte) (session.RefreshToken, error)) *MockRefreshTokensRepository_ByHash_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Create provides a mock function for the type MockRefreshTokensRepository
@@ -100,6 +168,78 @@ func (_c *MockRefreshTokensRepository_Create_Call) Return(err error) *MockRefres
 }
 
 func (_c *MockRefreshTokensRepository_Create_Call) RunAndReturn(run func(ctx context.Context, t session.RefreshToken) error) *MockRefreshTokensRepository_Create_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MarkUsed provides a mock function for the type MockRefreshTokensRepository
+func (_mock *MockRefreshTokensRepository) MarkUsed(ctx context.Context, id uuid.UUID, usedAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, id, usedAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkUsed")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, id, usedAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, time.Time) bool); ok {
+		r0 = returnFunc(ctx, id, usedAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, time.Time) error); ok {
+		r1 = returnFunc(ctx, id, usedAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRefreshTokensRepository_MarkUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkUsed'
+type MockRefreshTokensRepository_MarkUsed_Call struct {
+	*mock.Call
+}
+
+// MarkUsed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id uuid.UUID
+//   - usedAt time.Time
+func (_e *MockRefreshTokensRepository_Expecter) MarkUsed(ctx any, id any, usedAt any) *MockRefreshTokensRepository_MarkUsed_Call {
+	return &MockRefreshTokensRepository_MarkUsed_Call{Call: _e.mock.On("MarkUsed", ctx, id, usedAt)}
+}
+
+func (_c *MockRefreshTokensRepository_MarkUsed_Call) Run(run func(ctx context.Context, id uuid.UUID, usedAt time.Time)) *MockRefreshTokensRepository_MarkUsed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRefreshTokensRepository_MarkUsed_Call) Return(b bool, err error) *MockRefreshTokensRepository_MarkUsed_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockRefreshTokensRepository_MarkUsed_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID, usedAt time.Time) (bool, error)) *MockRefreshTokensRepository_MarkUsed_Call {
 	_c.Call.Return(run)
 	return _c
 }

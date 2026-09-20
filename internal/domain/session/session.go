@@ -21,3 +21,15 @@ func NewSession(userID uuid.UUID, ttl time.Duration, now time.Time) Session {
 		ExpiresAt: now.Add(ttl),
 	}
 }
+
+func (s Session) IsRevoked() bool {
+	return s.RevokedAt != nil
+}
+
+func (s Session) IsExpired(now time.Time) bool {
+	return !now.Before(s.ExpiresAt)
+}
+
+func (s Session) IsActive(now time.Time) bool {
+	return !s.IsRevoked() && !s.IsExpired(now)
+}
