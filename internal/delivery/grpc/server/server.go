@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"time"
 
 	"buf.build/go/protovalidate"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/selector"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -24,6 +27,8 @@ type Options struct {
 	MaxConnectionAge      time.Duration
 	MaxConnectionAgeGrace time.Duration
 	Validator             protovalidate.Validator
+	Verifier              interceptor.TokenVerifier
+	ProtectedMethods      []string
 }
 
 type Server struct {
@@ -40,6 +45,14 @@ func New(opts Options, log *slog.Logger) *Server {
 			interceptor.RequestID(),
 			interceptor.Logging(log),
 			interceptor.Validate(opts.Validator),
+			selector.UnaryServerInterceptor(
+				interceptor.Auth(opts.Verifier),
+				selector.MatchFunc(
+					func(_ context.Context, c interceptors.CallMeta) bool {
+						return slices.Contains(opts.ProtectedMethods, c.FullMethod())
+					},
+				),
+			),
 		),
 		grpc.KeepaliveParams(
 			keepalive.ServerParameters{
