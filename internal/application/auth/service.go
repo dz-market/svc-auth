@@ -99,6 +99,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 	s.log.InfoContext(
 		ctx, "user registered",
 		slog.String("user_id", u.ID.String()),
+		slog.String("session_id", issued.session.ID.String()),
 	)
 
 	return RegisterOutput{
@@ -158,6 +159,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	s.log.InfoContext(
 		ctx, "user logged in",
 		slog.String("user_id", u.ID.String()),
+		slog.String("session_id", issued.session.ID.String()),
 	)
 
 	return LoginOutput{
@@ -226,6 +228,33 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 		Access:  issued.access,
 		Refresh: issued.refresh,
 	}, nil
+}
+
+type LogoutInput struct {
+	SessionID uuid.UUID
+}
+
+func (s *Service) Logout(ctx context.Context, in LogoutInput) error {
+	now := s.clock.Now()
+
+	if err := s.uow.Do(
+		ctx, func(r Repositories) error {
+			if err := r.Sessions.Revoke(ctx, in.SessionID, now); err != nil {
+				return err
+			}
+
+			return r.RefreshTokens.MarkUsedBySessionID(ctx, in.SessionID, now)
+		},
+	); err != nil {
+		return err
+	}
+
+	s.log.InfoContext(
+		ctx, "user logged out",
+		slog.String("session_id", in.SessionID.String()),
+	)
+
+	return nil
 }
 
 type issuedTokens struct {

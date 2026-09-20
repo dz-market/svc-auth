@@ -96,6 +96,17 @@ func Run(ctx context.Context, version string) error {
 		return fmt.Errorf("access token issuer: %w", err)
 	}
 
+	accessTokenVerifier, err := jwt.NewVerifier(
+		jwt.VerifierOptions{
+			Key:      key,
+			Issuer:   cfg.Auth.Access.Issuer,
+			Audience: cfg.Auth.Access.Audience,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("access token verifier: %w", err)
+	}
+
 	refreshTokenGenerator, err := opaque.New(
 		opaque.Options{
 			Length: cfg.Auth.Refresh.Length,
@@ -156,6 +167,8 @@ func Run(ctx context.Context, version string) error {
 			MaxConnectionAge:      cfg.GRPC.Keepalive.MaxConnectionAge,
 			MaxConnectionAgeGrace: cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
 			Validator:             validator,
+			Verifier:              accessTokenVerifier,
+			ProtectedMethods:      []string{authv1.AuthService_Logout_FullMethodName},
 		},
 		log,
 	)

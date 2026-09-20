@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-type ctxKey struct{}
+type attrsKey struct{}
 
 func With(ctx context.Context, attrs ...slog.Attr) context.Context {
 	existing := attrsFrom(ctx)
@@ -14,11 +14,11 @@ func With(ctx context.Context, attrs ...slog.Attr) context.Context {
 	all = append(all, existing...)
 	all = append(all, attrs...)
 
-	return context.WithValue(ctx, ctxKey{}, all)
+	return context.WithValue(ctx, attrsKey{}, all)
 }
 
 func attrsFrom(ctx context.Context) []slog.Attr {
-	attrs, ok := ctx.Value(ctxKey{}).([]slog.Attr)
+	attrs, ok := ctx.Value(attrsKey{}).([]slog.Attr)
 	if !ok {
 		return nil
 	}

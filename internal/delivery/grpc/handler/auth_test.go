@@ -1,10 +1,12 @@
 package handler_test
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,6 +19,7 @@ import (
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler/mocks"
+	"github.com/dz-market/svc-auth/internal/delivery/grpc/identity"
 	"github.com/dz-market/svc-auth/internal/domain/session"
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
@@ -37,7 +40,8 @@ const (
 
 //nolint:gochecknoglobals // test fixtures
 var (
-	fixedNow = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	fixedNow  = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	sessionID = uuid.NewV7()
 
 	errFailed = errors.New("failed")
 )
@@ -79,6 +83,16 @@ func tokens() (accessToken, refreshToken auth.Token) {
 	}
 
 	return accessToken, refreshToken
+}
+
+func authenticated(t *testing.T) context.Context {
+	t.Helper()
+
+	return identity.With(
+		t.Context(), identity.Identity{
+			SessionID: sessionID,
+		},
+	)
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -366,4 +380,61 @@ func TestHandler_RefreshErrors(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestHandler_Logout(t *testing.T) {
+	t.Parallel()
+
+	h := newTestHandler(t)
+
+	h.service.EXPECT().
+		Logout(
+			mock.Anything, auth.LogoutInput{
+				SessionID: sessionID,
+			},
+		).
+		Return(nil)
+
+	resp, err := h.handler.Logout(authenticated(t), authv1.LogoutRequest_builder{}.Build())
+	require.NoError(t, err)
+
+	assert.NotNil(t, resp)
+}
+
+func TestHandler_LogoutWithoutIdentity(t *testing.T) {
+	t.Parallel()
+
+	h := newTestHandler(t)
+
+	resp, err := h.handler.Logout(t.Context(), authv1.LogoutRequest_builder{}.Build())
+
+	require.Error(t, err)
+	assert.Nil(t, resp)
+
+	st := status.Convert(err)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+	assert.Equal(t, "invalid access token", st.Message())
+}
+
+func TestHandler_LogoutError(t *testing.T) {
+	t.Parallel()
+
+	h := newTestHandler(t)
+
+	h.service.EXPECT().
+		Logout(
+			mock.Anything, auth.LogoutInput{
+				SessionID: sessionID,
+			},
+		).
+		Return(errFailed)
+
+	resp, err := h.handler.Logout(authenticated(t), authv1.LogoutRequest_builder{}.Build())
+
+	require.Error(t, err)
+	assert.Nil(t, resp)
+
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	assert.Equal(t, "internal error", st.Message())
 }
