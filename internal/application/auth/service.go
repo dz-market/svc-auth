@@ -261,9 +261,9 @@ func (s *Service) issueTokens(sess session.Session, now time.Time) (issuedTokens
 }
 
 type issuedSession struct {
-	session session.Session
-
 	issuedTokens
+
+	session session.Session
 }
 
 func (s *Service) issueSession(userID uuid.UUID, now time.Time) (issuedSession, error) {
