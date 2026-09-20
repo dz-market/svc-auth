@@ -16,6 +16,8 @@ import (
 
 const schemeBearer = "bearer"
 
+var errInvalidAccessToken = status.Error(codes.Unauthenticated, "invalid access token")
+
 type TokenVerifier interface {
 	Verify(token string) (userID, sessionID uuid.UUID, err error)
 }
@@ -25,12 +27,12 @@ func Auth(verifier TokenVerifier) grpc.UnaryServerInterceptor {
 		func(ctx context.Context) (context.Context, error) {
 			token, err := auth.AuthFromMD(ctx, schemeBearer)
 			if err != nil {
-				return nil, err
+				return nil, errInvalidAccessToken
 			}
 
 			userID, sessionID, err := verifier.Verify(token)
 			if err != nil {
-				return nil, status.Error(codes.Unauthenticated, "invalid access token")
+				return nil, errInvalidAccessToken
 			}
 
 			ctx = identity.With(
