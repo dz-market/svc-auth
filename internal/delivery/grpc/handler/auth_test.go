@@ -17,14 +17,16 @@ import (
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler/mocks"
+	"github.com/dz-market/svc-auth/internal/domain/session"
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
 const (
-	email        = "user@example.com"
-	password     = "password"
-	accessValue  = "access-token"
-	refreshValue = "refresh-token"
+	email           = "user@example.com"
+	password        = "password"
+	accessValue     = "access-token"
+	refreshValue    = "refresh-token"
+	oldRefreshValue = "old-refresh-token"
 
 	accessTTL  = 15 * time.Minute
 	refreshTTL = 720 * time.Hour
@@ -259,6 +261,99 @@ func TestHandler_LoginErrors(t *testing.T) {
 					t.Context(), authv1.LoginRequest_builder{
 						Email:    new(email),
 						Password: new(password),
+					}.Build(),
+				)
+
+				require.Error(t, err)
+				assert.Nil(t, resp)
+
+				st := status.Convert(err)
+				assert.Equal(t, tt.wantCode, st.Code())
+				assert.Equal(t, tt.wantMsg, st.Message())
+			},
+		)
+	}
+}
+
+func TestHandler_Refresh(t *testing.T) {
+	t.Parallel()
+
+	h := newTestHandler(t)
+
+	accessToken, refreshToken := tokens()
+
+	h.service.EXPECT().
+		Refresh(
+			mock.Anything, auth.RefreshInput{
+				RefreshToken: oldRefreshValue,
+			},
+		).
+		Return(
+			auth.RefreshOutput{
+				Access:  accessToken,
+				Refresh: refreshToken,
+			}, nil,
+		)
+
+	h.clock.EXPECT().
+		Now().
+		Return(fixedNow)
+
+	resp, err := h.handler.Refresh(
+		t.Context(), authv1.RefreshRequest_builder{
+			RefreshToken: new(oldRefreshValue),
+		}.Build(),
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, accessValue, resp.GetAccess().GetToken())
+	assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
+
+	assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
+	assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
+}
+
+func TestHandler_RefreshErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		give     error
+		wantCode codes.Code
+		wantMsg  string
+	}{
+		{
+			name:     "invalid refresh token",
+			give:     session.ErrInvalidRefreshToken,
+			wantCode: codes.Unauthenticated,
+			wantMsg:  session.ErrInvalidRefreshToken.Error(),
+		},
+		{
+			name:     "unknown error",
+			give:     errFailed,
+			wantCode: codes.Internal,
+			wantMsg:  "internal error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				h := newTestHandler(t)
+
+				h.service.EXPECT().
+					Refresh(
+						mock.Anything, auth.RefreshInput{
+							RefreshToken: oldRefreshValue,
+						},
+					).
+					Return(auth.RefreshOutput{}, tt.give)
+
+				resp, err := h.handler.Refresh(
+					t.Context(), authv1.RefreshRequest_builder{
+						RefreshToken: new(oldRefreshValue),
 					}.Build(),
 				)
 
