@@ -705,6 +705,88 @@ func TestService_Refresh(t *testing.T) {
 	}
 }
 
+func TestService_Logout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(s testService)
+		wantErr error
+	}{
+		{
+			name: "success",
+			setup: func(s testService) {
+				expectClock(s)
+				expectTransaction(s)
+				expectSessionRevoked(s)
+				expectSessionTokensMarkedUsed(s)
+			},
+		},
+		{
+			name: "transaction error",
+			setup: func(s testService) {
+				expectClock(s)
+
+				s.uow.EXPECT().
+					Do(mock.Anything, mock.Anything).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "revoke session error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectTransaction(s)
+
+				s.sessions.EXPECT().
+					Revoke(mock.Anything, storedSession.ID, fixedNow).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "mark session refresh tokens used error",
+			setup: func(s testService) {
+				expectClock(s)
+				expectTransaction(s)
+				expectSessionRevoked(s)
+
+				s.tokens.EXPECT().
+					MarkUsedBySessionID(mock.Anything, storedSession.ID, fixedNow).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				ts := newTestService(t)
+
+				tt.setup(ts)
+
+				err := ts.service.Logout(
+					t.Context(), auth.LogoutInput{
+						SessionID: storedSession.ID,
+					},
+				)
+
+				if tt.wantErr != nil {
+					require.ErrorIs(t, err, tt.wantErr)
+
+					return
+				}
+
+				require.NoError(t, err)
+			},
+		)
+	}
+}
+
 func expectClock(s testService) {
 	s.clock.EXPECT().
 		Now().
@@ -752,6 +834,18 @@ func expectTokenMarkedUsed(s testService) {
 	s.tokens.EXPECT().
 		MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
 		Return(true, nil)
+}
+
+func expectSessionRevoked(s testService) {
+	s.sessions.EXPECT().
+		Revoke(mock.Anything, storedSession.ID, fixedNow).
+		Return(nil)
+}
+
+func expectSessionTokensMarkedUsed(s testService) {
+	s.tokens.EXPECT().
+		MarkUsedBySessionID(mock.Anything, storedSession.ID, fixedNow).
+		Return(nil)
 }
 
 func expectAccessIssue(s testService) {
