@@ -22,11 +22,13 @@ type RefreshTokensRepository interface {
 	Create(ctx context.Context, t session.RefreshToken) error
 	ByHash(ctx context.Context, hash []byte) (session.RefreshToken, error)
 	MarkUsed(ctx context.Context, id uuid.UUID, usedAt time.Time) (bool, error)
+	MarkUsedBySessionID(ctx context.Context, sessionID uuid.UUID, usedAt time.Time) error
 }
 
 type SessionsRepository interface {
 	Create(ctx context.Context, s session.Session) error
 	ByID(ctx context.Context, id uuid.UUID) (session.Session, error)
+	Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error
 }
 
 type PasswordHasher interface {
