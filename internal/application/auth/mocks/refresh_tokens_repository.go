@@ -243,3 +243,66 @@ func (_c *MockRefreshTokensRepository_MarkUsed_Call) RunAndReturn(run func(ctx c
 	_c.Call.Return(run)
 	return _c
 }
+
+// MarkUsedBySessionID provides a mock function for the type MockRefreshTokensRepository
+func (_mock *MockRefreshTokensRepository) MarkUsedBySessionID(ctx context.Context, sessionID uuid.UUID, usedAt time.Time) error {
+	ret := _mock.Called(ctx, sessionID, usedAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkUsedBySessionID")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, time.Time) error); ok {
+		r0 = returnFunc(ctx, sessionID, usedAt)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRefreshTokensRepository_MarkUsedBySessionID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkUsedBySessionID'
+type MockRefreshTokensRepository_MarkUsedBySessionID_Call struct {
+	*mock.Call
+}
+
+// MarkUsedBySessionID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sessionID uuid.UUID
+//   - usedAt time.Time
+func (_e *MockRefreshTokensRepository_Expecter) MarkUsedBySessionID(ctx any, sessionID any, usedAt any) *MockRefreshTokensRepository_MarkUsedBySessionID_Call {
+	return &MockRefreshTokensRepository_MarkUsedBySessionID_Call{Call: _e.mock.On("MarkUsedBySessionID", ctx, sessionID, usedAt)}
+}
+
+func (_c *MockRefreshTokensRepository_MarkUsedBySessionID_Call) Run(run func(ctx context.Context, sessionID uuid.UUID, usedAt time.Time)) *MockRefreshTokensRepository_MarkUsedBySessionID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRefreshTokensRepository_MarkUsedBySessionID_Call) Return(err error) *MockRefreshTokensRepository_MarkUsedBySessionID_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRefreshTokensRepository_MarkUsedBySessionID_Call) RunAndReturn(run func(ctx context.Context, sessionID uuid.UUID, usedAt time.Time) error) *MockRefreshTokensRepository_MarkUsedBySessionID_Call {
+	_c.Call.Return(run)
+	return _c
+}
