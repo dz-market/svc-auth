@@ -1,0 +1,30 @@
+name: CD
+
+on:
+    push:
+        branches: [main]
+        tags: ["v*"]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    packages: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    images:
+        name: Images
+        strategy:
+            matrix:
+                include:
+                    - target: runtime
+                      suffix: ""
+                    - target: migrate
+                      suffix: "-migrate"
+        uses: dz-market/.github/.github/workflows/docker-release.yml@main
+        with:
+            target: ${{ matrix.target }}
+            suffix: ${{ matrix.suffix }}
