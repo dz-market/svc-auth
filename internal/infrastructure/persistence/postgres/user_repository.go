@@ -5,18 +5,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+
+	ppostgres "github.com/dz-market/platform/database/postgres"
 
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
 type UserRepository struct {
-	q Querier
+	q ppostgres.Querier
 }
 
-func NewUserRepository(q Querier) *UserRepository {
+func NewUserRepository(q ppostgres.Querier) *UserRepository {
 	return &UserRepository{
 		q: q,
 	}
@@ -29,7 +29,7 @@ func (r *UserRepository) Create(ctx context.Context, u user.User) error {
 	`
 
 	if _, err := r.q.Exec(ctx, query, u.ID, u.Email, u.PasswordHash, u.CreatedAt); err != nil {
-		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == pgerrcode.UniqueViolation {
+		if ppostgres.IsUniqueViolation(err, "") {
 			return fmt.Errorf("create user: %w", user.ErrEmailTaken)
 		}
 

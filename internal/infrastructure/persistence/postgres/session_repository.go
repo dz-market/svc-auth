@@ -9,14 +9,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	ppostgres "github.com/dz-market/platform/database/postgres"
+
 	"github.com/dz-market/svc-auth/internal/domain/session"
 )
 
 type SessionRepository struct {
-	q Querier
+	q ppostgres.Querier
 }
 
-func NewSessionRepository(q Querier) *SessionRepository {
+func NewSessionRepository(q ppostgres.Querier) *SessionRepository {
 	return &SessionRepository{
 		q: q,
 	}

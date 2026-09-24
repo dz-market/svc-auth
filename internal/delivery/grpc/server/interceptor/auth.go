@@ -10,8 +10,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dz-market/platform/logger"
+
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/identity"
-	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 )
 
 const schemeBearer = "bearer"

@@ -3,6 +3,8 @@ package config
 import (
 	"log/slog"
 	"time"
+
+	pconfig "github.com/dz-market/platform/config"
 )
 
 type Config struct {
@@ -17,9 +19,9 @@ type Config struct {
 }
 
 type GRPC struct {
-	Addr           string   `validate:"required"                          yaml:"addr"`
-	Reflection     bool     `yaml:"reflection"`
-	MaxRecvMsgSize ByteSize `validate:"required,minsize=1KB,maxsize=64MB" yaml:"max_recv_msg_size"`
+	Addr           string           `validate:"required"                          yaml:"addr"`
+	Reflection     bool             `yaml:"reflection"`
+	MaxRecvMsgSize pconfig.ByteSize `validate:"required,minsize=1KB,maxsize=64MB" yaml:"max_recv_msg_size"`
 
 	Keepalive Keepalive `yaml:"keepalive"`
 }
@@ -68,12 +70,12 @@ type Password struct {
 }
 
 type Argon2ID struct {
-	Memory      ByteSize `validate:"required,minsize=15MB,maxsize=1GB" yaml:"memory"`
-	Iterations  uint32   `validate:"required,min=1"                    yaml:"iterations"`
-	Parallelism uint8    `validate:"required,min=1"                    yaml:"parallelism"`
-	SaltLength  uint32   `validate:"required,min=16"                   yaml:"salt_length"`
-	KeyLength   uint32   `validate:"required,min=32"                   yaml:"key_length"`
-	MaxInFlight int      `validate:"required,min=1"                    yaml:"max_in_flight"`
+	Memory      pconfig.ByteSize `validate:"required,minsize=15MB,maxsize=1GB" yaml:"memory"`
+	Iterations  uint32           `validate:"required,min=1"                    yaml:"iterations"`
+	Parallelism uint8            `validate:"required,min=1"                    yaml:"parallelism"`
+	SaltLength  uint32           `validate:"required,min=16"                   yaml:"salt_length"`
+	KeyLength   uint32           `validate:"required,min=32"                   yaml:"key_length"`
+	MaxInFlight int              `validate:"required,min=1"                    yaml:"max_in_flight"`
 }
 
 type Health struct {

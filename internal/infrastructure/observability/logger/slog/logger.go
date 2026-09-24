@@ -2,36 +2,24 @@ package slog
 
 import (
 	"log/slog"
-	"os"
-)
 
-type Format string
-
-const (
-	FormatJSON Format = "json"
-	FormatText Format = "text"
+	plogger "github.com/dz-market/platform/logger/slog"
 )
 
 type Options struct {
 	Level   slog.Level
-	Format  Format
+	Format  string
 	Service string
 	Version string
 }
 
 func New(opts Options) *slog.Logger {
-	handlerOpts := &slog.HandlerOptions{Level: opts.Level}
-
-	var handler slog.Handler
-
-	if opts.Format == FormatText {
-		handler = slog.NewTextHandler(os.Stdout, handlerOpts)
-	} else {
-		handler = slog.NewJSONHandler(os.Stdout, handlerOpts)
-	}
-
-	return slog.New(contextHandler{handler}).With(
-		slog.String("service", opts.Service),
-		slog.String("version", opts.Version),
+	return plogger.New(
+		plogger.Options{
+			Level:   opts.Level,
+			Format:  plogger.Format(opts.Format),
+			Service: opts.Service,
+			Version: opts.Version,
+		},
 	)
 }

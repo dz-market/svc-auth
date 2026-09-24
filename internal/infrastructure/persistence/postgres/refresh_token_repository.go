@@ -9,14 +9,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	ppostgres "github.com/dz-market/platform/database/postgres"
+
 	"github.com/dz-market/svc-auth/internal/domain/session"
 )
 
 type RefreshTokenRepository struct {
-	q Querier
+	q ppostgres.Querier
 }
 
-func NewRefreshTokenRepository(q Querier) *RefreshTokenRepository {
+func NewRefreshTokenRepository(q ppostgres.Querier) *RefreshTokenRepository {
 	return &RefreshTokenRepository{
 		q: q,
 	}

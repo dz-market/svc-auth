@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"buf.build/go/protovalidate"
 	"golang.org/x/sync/errgroup"
 
+	ppostgres "github.com/dz-market/platform/database/postgres"
 	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
@@ -40,12 +40,11 @@ func Run(ctx context.Context, version string) error {
 	log := logger.New(
 		logger.Options{
 			Level:   cfg.Log.Level,
-			Format:  logger.Format(cfg.Log.Format),
+			Format:  cfg.Log.Format,
 			Service: cfg.ServiceName,
 			Version: version,
 		},
 	)
-
 	log.DebugContext(ctx, "configuration loaded")
 
 	log.InfoContext(
@@ -70,7 +69,7 @@ func Run(ctx context.Context, version string) error {
 		}, log,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("postgres: %w", err)
 	}
 
 	defer db.Close()
@@ -118,7 +117,8 @@ func Run(ctx context.Context, version string) error {
 
 	hasher := argon2id.New(
 		argon2id.Params{
-			MemoryKiB:   cfg.Auth.Password.Argon2ID.Memory.KiB(),
+			//nolint:gosec // bounded by the validation on the config field
+			MemoryKiB:   uint32(cfg.Auth.Password.Argon2ID.Memory.KiB()),
 			Iterations:  cfg.Auth.Password.Argon2ID.Iterations,
 			Parallelism: cfg.Auth.Password.Argon2ID.Parallelism,
 			SaltLength:  cfg.Auth.Password.Argon2ID.SaltLength,
@@ -129,7 +129,7 @@ func Run(ctx context.Context, version string) error {
 
 	systemClock := clock.System{}
 
-	newAuthRepos := func(q postgres.Querier) auth.Repositories {
+	newAuthRepos := func(q ppostgres.Querier) auth.Repositories {
 		return auth.Repositories{
 			Users:         postgres.NewUserRepository(q),
 			RefreshTokens: postgres.NewRefreshTokenRepository(q),
@@ -140,7 +140,7 @@ func Run(ctx context.Context, version string) error {
 	authService := auth.New(
 		auth.Options{
 			Repos:             newAuthRepos(db),
-			UoW:               postgres.NewUnitOfWork(db, newAuthRepos),
+			UoW:               ppostgres.NewUnitOfWork(db, newAuthRepos),
 			Hasher:            hasher,
 			AccessTokenIssuer: accessTokenIssuer,
 			RefreshGenerator:  refreshTokenGenerator,
@@ -151,7 +151,12 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
-	checker := health.New(log, cfg.Health.Timeout)
+	checker := health.New(
+		health.Options{
+			Period:  cfg.Health.Period,
+			Timeout: cfg.Health.Timeout,
+		}, log,
+	)
 	checker.Register("postgres", db.Ping)
 
 	validator, err := protovalidate.New()
@@ -168,7 +173,6 @@ func Run(ctx context.Context, version string) error {
 			MaxConnectionAgeGrace: cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
 			Validator:             validator,
 			Verifier:              accessTokenVerifier,
-			ProtectedMethods:      []string{authv1.AuthService_Logout_FullMethodName},
 		},
 		log,
 	)
@@ -188,11 +192,13 @@ func Run(ctx context.Context, version string) error {
 	g.Go(
 		func() error {
 			return checker.Run(
-				ctx, cfg.Health.Period, func(healthy bool) {
+				ctx, func(healthy bool) {
 					log.WarnContext(
-						ctx, "health state changed",
+						ctx, "healthy state changed",
 						slog.Bool("healthy", healthy),
 					)
+
+					srv.SetHealthy(healthy)
 				},
 			)
 		},
@@ -200,25 +206,15 @@ func Run(ctx context.Context, version string) error {
 
 	g.Go(
 		func() error {
-			return srv.Serve(ctx)
+			return srv.Run(ctx)
 		},
 	)
 
-	g.Go(
-		func() error {
-			<-ctx.Done()
-
-			log.InfoContext(ctx, "shutdown requested")
-			srv.Shutdown(ctx, cfg.ShutdownTimeout)
-			log.InfoContext(ctx, "service stopped")
-
-			return nil
-		},
-	)
-
-	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+	if err := g.Wait(); err != nil {
 		return err
 	}
+
+	log.InfoContext(ctx, "service stopped")
 
 	return nil
 }

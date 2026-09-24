@@ -2,13 +2,10 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
+	ppostgres "github.com/dz-market/platform/database/postgres"
 )
 
 type Options struct {
@@ -23,104 +20,18 @@ type Options struct {
 	PingTimeout       time.Duration
 }
 
-type DB struct {
-	pool *pgxpool.Pool
-	log  *slog.Logger
-}
-
-func New(ctx context.Context, opts Options, log *slog.Logger) (*DB, error) {
-	cfg, err := pgxpool.ParseConfig(opts.DSN)
-	if err != nil {
-		return nil, fmt.Errorf("parse dsn: %w", err)
-	}
-
-	applyOptions(cfg, opts)
-
-	if opts.PingTimeout > 0 {
-		cfg.PingTimeout = opts.PingTimeout
-	}
-
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("open pool: %w", err)
-	}
-
-	db := &DB{
-		pool: pool,
-		log:  log,
-	}
-
-	pingCtx, cancel := context.WithTimeout(ctx, opts.ConnectTimeout)
-	defer cancel()
-
-	if err := db.Ping(pingCtx); err != nil {
-		pool.Close()
-
-		return nil, fmt.Errorf("ping pool: %w", err)
-	}
-
-	log.InfoContext(
-		ctx, "postgres connected",
-		slog.String("host", cfg.ConnConfig.Host),
-		slog.Int("port", int(cfg.ConnConfig.Port)),
-		slog.String("database", cfg.ConnConfig.Database),
-		slog.String("user", cfg.ConnConfig.User),
-		slog.Int("max_conns", int(cfg.MaxConns)),
+func New(ctx context.Context, opts Options, log *slog.Logger) (*ppostgres.DB, error) {
+	return ppostgres.New(
+		ctx, ppostgres.Options{
+			AppName:           opts.AppName,
+			DSN:               opts.DSN,
+			MaxConns:          opts.MaxConns,
+			MinConns:          opts.MinConns,
+			MaxConnLifetime:   opts.MaxConnLifetime,
+			MaxConnIdleTime:   opts.MaxConnIdleTime,
+			HealthCheckPeriod: opts.HealthCheckPeriod,
+			ConnectTimeout:    opts.ConnectTimeout,
+			PingTimeout:       opts.PingTimeout,
+		}, log,
 	)
-
-	return db, nil
-}
-
-func (d *DB) Ping(ctx context.Context) error {
-	if err := d.pool.Ping(ctx); err != nil {
-		return fmt.Errorf("ping postgres: %w", err)
-	}
-
-	return nil
-}
-
-func (d *DB) Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
-	return d.pool.Exec(ctx, query, args...)
-}
-
-func (d *DB) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
-	return d.pool.Query(ctx, query, args...)
-}
-
-func (d *DB) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
-	return d.pool.QueryRow(ctx, query, args...)
-}
-
-func (d *DB) Close() {
-	d.pool.Close()
-
-	d.log.Info("postgres pool closed")
-}
-
-func applyOptions(cfg *pgxpool.Config, opts Options) {
-	cfg.ConnConfig.RuntimeParams["application_name"] = opts.AppName
-
-	if opts.ConnectTimeout > 0 {
-		cfg.ConnConfig.ConnectTimeout = opts.ConnectTimeout
-	}
-
-	if opts.MaxConns > 0 {
-		cfg.MaxConns = opts.MaxConns
-	}
-
-	if opts.MinConns > 0 {
-		cfg.MinConns = opts.MinConns
-	}
-
-	if opts.MaxConnLifetime > 0 {
-		cfg.MaxConnLifetime = opts.MaxConnLifetime
-	}
-
-	if opts.MaxConnIdleTime > 0 {
-		cfg.MaxConnIdleTime = opts.MaxConnIdleTime
-	}
-
-	if opts.HealthCheckPeriod > 0 {
-		cfg.HealthCheckPeriod = opts.HealthCheckPeriod
-	}
 }
