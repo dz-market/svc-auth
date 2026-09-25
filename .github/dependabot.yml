@@ -10,7 +10,7 @@ updates:
                 patterns: [ "*" ]
         ignore:
             -   dependency-name: google.golang.org/grpc
-                version: [ "1.84.0" ]
+                versions: [ "1.84.0" ]
         commit-message:
             prefix: build
             include: scope
