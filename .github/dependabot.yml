@@ -1,13 +1,16 @@
 version: 2
 
 updates:
-    - package-ecosystem: gomod
-      directory: /
-      schedule:
-          interval: weekly
-      groups:
-          go-dependencies:
-              patterns: ["*"]
-      commit-message:
-          prefix: build
-          include: scope
+    -   package-ecosystem: gomod
+        directory: /
+        schedule:
+            interval: weekly
+        groups:
+            go-dependencies:
+                patterns: [ "*" ]
+        ignore:
+            -   dependency-name: google.golang.org/grpc
+                version: [ "1.84.0" ]
+        commit-message:
+            prefix: build
+            include: scope
