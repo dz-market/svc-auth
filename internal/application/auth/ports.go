@@ -31,6 +31,10 @@ type SessionsRepository interface {
 	Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error
 }
 
+type OutboxRepository interface {
+	AddUserRegistered(ctx context.Context, e user.Registered) error
+}
+
 type PasswordHasher interface {
 	Hash(ctx context.Context, password string) (string, error)
 	Verify(ctx context.Context, password, passwordHash string) (bool, error)
@@ -49,6 +53,7 @@ type Repositories struct {
 	Users         UsersRepository
 	RefreshTokens RefreshTokensRepository
 	Sessions      SessionsRepository
+	Outbox        OutboxRepository
 }
 
 type UnitOfWork interface {

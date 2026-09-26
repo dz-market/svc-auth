@@ -90,7 +90,11 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 				return err
 			}
 
-			return r.RefreshTokens.Create(ctx, issued.refreshToken)
+			if err := r.RefreshTokens.Create(ctx, issued.refreshToken); err != nil {
+				return err
+			}
+
+			return r.Outbox.AddUserRegistered(ctx, user.NewRegistered(u))
 		},
 	); err != nil {
 		return RegisterOutput{}, err

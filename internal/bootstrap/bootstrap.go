@@ -134,6 +134,7 @@ func Run(ctx context.Context, version string) error {
 			Users:         postgres.NewUserRepository(q),
 			RefreshTokens: postgres.NewRefreshTokenRepository(q),
 			Sessions:      postgres.NewSessionRepository(q),
+			Outbox:        postgres.NewOutboxRepository(q),
 		}
 	}
 
