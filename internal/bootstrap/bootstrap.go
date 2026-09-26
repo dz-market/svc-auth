@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	ppostgres "github.com/dz-market/platform/database/postgres"
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/config"

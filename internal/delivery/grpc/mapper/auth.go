@@ -3,7 +3,7 @@ package mapper
 import (
 	"time"
 
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 )
