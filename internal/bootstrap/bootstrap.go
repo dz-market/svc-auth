@@ -20,12 +20,14 @@ import (
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
 	"github.com/dz-market/svc-auth/internal/infrastructure/clock"
+	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 	"github.com/dz-market/svc-auth/internal/infrastructure/security/argon2id"
 	"github.com/dz-market/svc-auth/internal/infrastructure/security/jwt"
 	"github.com/dz-market/svc-auth/internal/infrastructure/security/opaque"
+	"github.com/dz-market/svc-auth/internal/worker/outbox"
 )
 
 func Run(ctx context.Context, version string) error {
@@ -73,6 +75,20 @@ func Run(ctx context.Context, version string) error {
 	}
 
 	defer db.Close()
+
+	kafkaClient, err := kafka.NewClient(
+		kafka.Options{
+			Brokers:         cfg.Kafka.Brokers,
+			ClientID:        cfg.ServiceName,
+			DeliveryTimeout: cfg.Kafka.DeliveryTimeout,
+			Log:             log,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("kafka: %w", err)
+	}
+
+	defer kafkaClient.Close()
 
 	key, err := jwt.LoadKeyPair(cfg.Auth.Access.PrivateKeyPath, cfg.Auth.Access.PublicKeyPath)
 	if err != nil {
@@ -152,6 +168,23 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
+	relay := outbox.New(
+		outbox.Options{
+			UoW: ppostgres.NewUnitOfWork(
+				db, func(q ppostgres.Querier) outbox.Store {
+					return postgres.NewOutboxRepository(q)
+				},
+			),
+			Publisher:    kafka.NewPublisher(kafkaClient),
+			Clock:        systemClock,
+			PollInterval: cfg.Outbox.PollInterval,
+			BatchSize:    cfg.Outbox.BatchSize,
+			BatchTimeout: cfg.Outbox.BatchTimeout,
+			MaxAttempts:  cfg.Outbox.MaxAttempts,
+			Log:          log,
+		},
+	)
+
 	checker := health.New(
 		health.Options{
 			Period:  cfg.Health.Period,
@@ -208,6 +241,21 @@ func Run(ctx context.Context, version string) error {
 	g.Go(
 		func() error {
 			return srv.Run(ctx)
+		},
+	)
+
+	g.Go(
+		func() error {
+			kafka.EnsureTopics(
+				ctx, kafkaClient, []kafka.Topic{
+					{
+						Name:       kafka.TopicUserRegistered,
+						Partitions: cfg.Kafka.Topics.UserRegistered.Partitions,
+					},
+				}, log,
+			)
+
+			return relay.Run(ctx)
 		},
 	)
 
