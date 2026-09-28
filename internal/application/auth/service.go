@@ -18,7 +18,6 @@ type Options struct {
 	Hasher            PasswordHasher
 	AccessTokenIssuer AccessTokenIssuer
 	RefreshGenerator  RefreshTokenGenerator
-	Clock             Clock
 	AccessTokenTTL    time.Duration
 	SessionTTL        time.Duration
 	Log               *slog.Logger
@@ -30,7 +29,6 @@ type Service struct {
 	hasher                PasswordHasher
 	accessTokenIssuer     AccessTokenIssuer
 	refreshTokenGenerator RefreshTokenGenerator
-	clock                 Clock
 	accessTokenTTL        time.Duration
 	sessionTTL            time.Duration
 	log                   *slog.Logger
@@ -43,7 +41,6 @@ func New(opts Options) *Service {
 		hasher:                opts.Hasher,
 		accessTokenIssuer:     opts.AccessTokenIssuer,
 		refreshTokenGenerator: opts.RefreshGenerator,
-		clock:                 opts.Clock,
 		accessTokenTTL:        opts.AccessTokenTTL,
 		sessionTTL:            opts.SessionTTL,
 		log:                   opts.Log,
@@ -66,7 +63,7 @@ type RegisterOutput struct {
 }
 
 func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutput, error) {
-	now := s.clock.Now()
+	now := time.Now().UTC()
 
 	passwordHash, err := s.hasher.Hash(ctx, in.Password)
 	if err != nil {
@@ -123,7 +120,7 @@ type LoginOutput struct {
 }
 
 func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error) {
-	now := s.clock.Now()
+	now := time.Now().UTC()
 
 	u, err := s.repos.Users.ByEmail(ctx, user.NormalizeEmail(in.Email))
 	if err != nil {
@@ -182,7 +179,7 @@ type RefreshOutput struct {
 }
 
 func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, error) {
-	now := s.clock.Now()
+	now := time.Now().UTC()
 
 	rt, err := s.repos.RefreshTokens.ByHash(ctx, s.refreshTokenGenerator.Fingerprint(in.RefreshToken))
 	if err != nil {
@@ -239,7 +236,7 @@ type LogoutInput struct {
 }
 
 func (s *Service) Logout(ctx context.Context, in LogoutInput) error {
-	now := s.clock.Now()
+	now := time.Now().UTC()
 
 	if err := s.uow.Do(
 		ctx, func(r Repositories) error {

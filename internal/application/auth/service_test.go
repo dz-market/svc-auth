@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
+	"testing/synctest"
 	"time"
 	"uuid"
 
@@ -34,7 +35,7 @@ const (
 
 //nolint:gochecknoglobals // test fixtures
 var (
-	fixedNow              = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	fixedNow              = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 	refreshFingerprint    = []byte("refresh-fingerprint")
 	oldRefreshFingerprint = []byte("old-refresh-fingerprint")
 
@@ -66,7 +67,6 @@ type testService struct {
 	t *testing.T
 
 	service   *auth.Service
-	clock     *mocks.MockClock
 	users     *mocks.MockUsersRepository
 	tokens    *mocks.MockRefreshTokensRepository
 	sessions  *mocks.MockSessionsRepository
@@ -81,7 +81,6 @@ func newTestService(t *testing.T) testService {
 
 	s := testService{
 		t:         t,
-		clock:     mocks.NewMockClock(t),
 		users:     mocks.NewMockUsersRepository(t),
 		tokens:    mocks.NewMockRefreshTokensRepository(t),
 		sessions:  mocks.NewMockSessionsRepository(t),
@@ -104,7 +103,6 @@ func newTestService(t *testing.T) testService {
 			Hasher:            s.hasher,
 			AccessTokenIssuer: s.issuer,
 			RefreshGenerator:  s.generator,
-			Clock:             s.clock,
 			AccessTokenTTL:    accessTTL,
 			SessionTTL:        sessionTTL,
 			Log:               slog.New(slog.DiscardHandler),
@@ -126,7 +124,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "success",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 				expectTokensIssued(s)
 				expectTransaction(s)
@@ -146,8 +143,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "hash password error",
 			setup: func(s testService) {
-				expectClock(s)
-
 				s.hasher.EXPECT().
 					Hash(mock.Anything, password).
 					Return("", errFailed)
@@ -157,7 +152,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "issue access token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 
 				s.issuer.EXPECT().
@@ -169,7 +163,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "generate refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 				expectAccessIssue(s)
 
@@ -182,7 +175,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "transaction error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 				expectTokensIssued(s)
 
@@ -195,7 +187,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "create user error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 				expectTokensIssued(s)
 				expectTransaction(s)
@@ -209,7 +200,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "create session error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 				expectTokensIssued(s)
 				expectTransaction(s)
@@ -227,7 +217,6 @@ func TestService_Register(t *testing.T) {
 		{
 			name: "create refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectPasswordHash(s)
 				expectTokensIssued(s)
 				expectTransaction(s)
@@ -253,26 +242,30 @@ func TestService_Register(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				ts := newTestService(t)
+				synctest.Test(
+					t, func(t *testing.T) {
+						ts := newTestService(t)
 
-				tt.setup(ts)
+						tt.setup(ts)
 
-				out, err := ts.service.Register(
-					t.Context(), auth.RegisterInput{
-						Email:    email,
-						Password: password,
+						out, err := ts.service.Register(
+							t.Context(), auth.RegisterInput{
+								Email:    email,
+								Password: password,
+							},
+						)
+
+						if tt.wantErr != nil {
+							require.ErrorIs(t, err, tt.wantErr)
+							assert.Zero(t, out)
+
+							return
+						}
+
+						require.NoError(t, err)
+						assert.Equal(t, tt.want, out)
 					},
 				)
-
-				if tt.wantErr != nil {
-					require.ErrorIs(t, err, tt.wantErr)
-					assert.Zero(t, out)
-
-					return
-				}
-
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, out)
 			},
 		)
 	}
@@ -290,7 +283,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "success",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 				expectPasswordMatch(s)
 				expectAccessIssue(s)
@@ -312,8 +304,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "user not found",
 			setup: func(s testService) {
-				expectClock(s)
-
 				s.users.EXPECT().
 					ByEmail(mock.Anything, email).
 					Return(user.User{}, user.ErrNotFound)
@@ -323,8 +313,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "find user error",
 			setup: func(s testService) {
-				expectClock(s)
-
 				s.users.EXPECT().
 					ByEmail(mock.Anything, email).
 					Return(user.User{}, errFailed)
@@ -334,7 +322,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "wrong password",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 
 				s.hasher.EXPECT().
@@ -346,7 +333,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "verify password error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 
 				s.hasher.EXPECT().
@@ -358,7 +344,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "issue access token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 				expectPasswordMatch(s)
 
@@ -371,7 +356,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "generate refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 				expectPasswordMatch(s)
 				expectAccessIssue(s)
@@ -385,7 +369,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "transaction error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 				expectPasswordMatch(s)
 				expectAccessIssue(s)
@@ -400,7 +383,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "create session error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 				expectPasswordMatch(s)
 				expectAccessIssue(s)
@@ -416,7 +398,6 @@ func TestService_Login(t *testing.T) {
 		{
 			name: "create refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectUserFound(s)
 				expectPasswordMatch(s)
 				expectAccessIssue(s)
@@ -440,26 +421,30 @@ func TestService_Login(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				ts := newTestService(t)
+				synctest.Test(
+					t, func(t *testing.T) {
+						ts := newTestService(t)
 
-				tt.setup(ts)
+						tt.setup(ts)
 
-				out, err := ts.service.Login(
-					t.Context(), auth.LoginInput{
-						Email:    email,
-						Password: password,
+						out, err := ts.service.Login(
+							t.Context(), auth.LoginInput{
+								Email:    email,
+								Password: password,
+							},
+						)
+
+						if tt.wantErr != nil {
+							require.ErrorIs(t, err, tt.wantErr)
+							assert.Zero(t, out)
+
+							return
+						}
+
+						require.NoError(t, err)
+						assert.Equal(t, tt.want, out)
 					},
 				)
-
-				if tt.wantErr != nil {
-					require.ErrorIs(t, err, tt.wantErr)
-					assert.Zero(t, out)
-
-					return
-				}
-
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, out)
 			},
 		)
 	}
@@ -477,7 +462,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "success",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -500,7 +484,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "refresh token not found",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 
 				s.tokens.EXPECT().
@@ -512,7 +495,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "find refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 
 				s.tokens.EXPECT().
@@ -524,7 +506,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "session not found",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 
@@ -537,7 +518,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "find session error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 
@@ -550,7 +530,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "session revoked",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 
@@ -568,7 +547,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "session expired",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 
@@ -584,7 +562,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "issue access token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -598,7 +575,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "generate refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -613,7 +589,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "transaction error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -628,7 +603,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "mark refresh token used error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -644,7 +618,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "refresh token already used",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -660,7 +633,6 @@ func TestService_Refresh(t *testing.T) {
 		{
 			name: "create refresh token error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
 				expectSessionFound(s)
@@ -681,25 +653,29 @@ func TestService_Refresh(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				ts := newTestService(t)
+				synctest.Test(
+					t, func(t *testing.T) {
+						ts := newTestService(t)
 
-				tt.setup(ts)
+						tt.setup(ts)
 
-				out, err := ts.service.Refresh(
-					t.Context(), auth.RefreshInput{
-						RefreshToken: oldRefreshValue,
+						out, err := ts.service.Refresh(
+							t.Context(), auth.RefreshInput{
+								RefreshToken: oldRefreshValue,
+							},
+						)
+
+						if tt.wantErr != nil {
+							require.ErrorIs(t, err, tt.wantErr)
+							assert.Zero(t, out)
+
+							return
+						}
+
+						require.NoError(t, err)
+						assert.Equal(t, tt.want, out)
 					},
 				)
-
-				if tt.wantErr != nil {
-					require.ErrorIs(t, err, tt.wantErr)
-					assert.Zero(t, out)
-
-					return
-				}
-
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, out)
 			},
 		)
 	}
@@ -716,7 +692,6 @@ func TestService_Logout(t *testing.T) {
 		{
 			name: "success",
 			setup: func(s testService) {
-				expectClock(s)
 				expectTransaction(s)
 				expectSessionRevoked(s)
 				expectSessionTokensMarkedUsed(s)
@@ -725,8 +700,6 @@ func TestService_Logout(t *testing.T) {
 		{
 			name: "transaction error",
 			setup: func(s testService) {
-				expectClock(s)
-
 				s.uow.EXPECT().
 					Do(mock.Anything, mock.Anything).
 					Return(errFailed)
@@ -736,7 +709,6 @@ func TestService_Logout(t *testing.T) {
 		{
 			name: "revoke session error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectTransaction(s)
 
 				s.sessions.EXPECT().
@@ -748,7 +720,6 @@ func TestService_Logout(t *testing.T) {
 		{
 			name: "mark session refresh tokens used error",
 			setup: func(s testService) {
-				expectClock(s)
 				expectTransaction(s)
 				expectSessionRevoked(s)
 
@@ -765,33 +736,30 @@ func TestService_Logout(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				ts := newTestService(t)
+				synctest.Test(
+					t, func(t *testing.T) {
+						ts := newTestService(t)
 
-				tt.setup(ts)
+						tt.setup(ts)
 
-				err := ts.service.Logout(
-					t.Context(), auth.LogoutInput{
-						SessionID: storedSession.ID,
+						err := ts.service.Logout(
+							t.Context(), auth.LogoutInput{
+								SessionID: storedSession.ID,
+							},
+						)
+
+						if tt.wantErr != nil {
+							require.ErrorIs(t, err, tt.wantErr)
+
+							return
+						}
+
+						require.NoError(t, err)
 					},
 				)
-
-				if tt.wantErr != nil {
-					require.ErrorIs(t, err, tt.wantErr)
-
-					return
-				}
-
-				require.NoError(t, err)
 			},
 		)
 	}
-}
-
-func expectClock(s testService) {
-	s.clock.EXPECT().
-		Now().
-		Return(fixedNow).
-		Once()
 }
 
 func expectPasswordHash(s testService) {

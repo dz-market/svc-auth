@@ -38,7 +38,3 @@ type UnitOfWork interface {
 type Publisher interface {
 	Publish(ctx context.Context, msgs []Message) []Result
 }
-
-type Clock interface {
-	Now() time.Time
-}

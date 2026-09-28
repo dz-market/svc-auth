@@ -19,7 +19,6 @@ import (
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
-	"github.com/dz-market/svc-auth/internal/infrastructure/clock"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
@@ -143,8 +142,6 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
-	systemClock := clock.System{}
-
 	newAuthRepos := func(q ppostgres.Querier) auth.Repositories {
 		return auth.Repositories{
 			Users:         postgres.NewUserRepository(q),
@@ -161,7 +158,6 @@ func Run(ctx context.Context, version string) error {
 			Hasher:            hasher,
 			AccessTokenIssuer: accessTokenIssuer,
 			RefreshGenerator:  refreshTokenGenerator,
-			Clock:             systemClock,
 			AccessTokenTTL:    cfg.Auth.Access.TTL,
 			SessionTTL:        cfg.Auth.Session.TTL,
 			Log:               log,
@@ -176,7 +172,6 @@ func Run(ctx context.Context, version string) error {
 				},
 			),
 			Publisher:    kafka.NewPublisher(kafkaClient),
-			Clock:        systemClock,
 			PollInterval: cfg.Outbox.PollInterval,
 			BatchSize:    cfg.Outbox.BatchSize,
 			BatchTimeout: cfg.Outbox.BatchTimeout,
@@ -215,7 +210,6 @@ func Run(ctx context.Context, version string) error {
 		srv.Registrar(), handler.NewAuth(
 			handler.Options{
 				Service: authService,
-				Clock:   systemClock,
 				Log:     log,
 			},
 		),

@@ -16,7 +16,6 @@ const (
 type Options struct {
 	UoW          UnitOfWork
 	Publisher    Publisher
-	Clock        Clock
 	PollInterval time.Duration
 	BatchSize    int
 	BatchTimeout time.Duration
@@ -27,7 +26,6 @@ type Options struct {
 type Relay struct {
 	uow          UnitOfWork
 	publisher    Publisher
-	clock        Clock
 	pollInterval time.Duration
 	batchSize    int
 	batchTimeout time.Duration
@@ -39,7 +37,6 @@ func New(opts Options) *Relay {
 	return &Relay{
 		uow:          opts.UoW,
 		publisher:    opts.Publisher,
-		clock:        opts.Clock,
 		pollInterval: opts.PollInterval,
 		batchSize:    opts.BatchSize,
 		batchTimeout: opts.BatchTimeout,
@@ -90,7 +87,7 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 
 	err := r.uow.Do(
 		ctx, func(s Store) error {
-			now := r.clock.Now()
+			now := time.Now().UTC()
 
 			msgs, err := s.Unpublished(ctx, r.batchSize, now)
 			if err != nil {
