@@ -70,6 +70,7 @@ type testService struct {
 	users     *mocks.MockUsersRepository
 	tokens    *mocks.MockRefreshTokensRepository
 	sessions  *mocks.MockSessionsRepository
+	outbox    *mocks.MockOutboxRepository
 	hasher    *mocks.MockPasswordHasher
 	issuer    *mocks.MockAccessTokenIssuer
 	generator *mocks.MockRefreshTokenGenerator
@@ -84,6 +85,7 @@ func newTestService(t *testing.T) testService {
 		users:     mocks.NewMockUsersRepository(t),
 		tokens:    mocks.NewMockRefreshTokensRepository(t),
 		sessions:  mocks.NewMockSessionsRepository(t),
+		outbox:    mocks.NewMockOutboxRepository(t),
 		hasher:    mocks.NewMockPasswordHasher(t),
 		issuer:    mocks.NewMockAccessTokenIssuer(t),
 		generator: mocks.NewMockRefreshTokenGenerator(t),
@@ -94,6 +96,7 @@ func newTestService(t *testing.T) testService {
 		Users:         s.users,
 		RefreshTokens: s.tokens,
 		Sessions:      s.sessions,
+		Outbox:        s.outbox,
 	}
 
 	s.service = auth.New(
@@ -231,6 +234,31 @@ func TestService_Register(t *testing.T) {
 
 				s.tokens.EXPECT().
 					Create(mock.Anything, mock.Anything).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "add outbox event error",
+			setup: func(s testService) {
+				expectPasswordHash(s)
+				expectTokensIssued(s)
+				expectTransaction(s)
+
+				s.users.EXPECT().
+					Create(mock.Anything, mock.Anything).
+					Return(nil)
+
+				s.sessions.EXPECT().
+					Create(mock.Anything, mock.Anything).
+					Return(nil)
+
+				s.tokens.EXPECT().
+					Create(mock.Anything, mock.Anything).
+					Return(nil)
+
+				s.outbox.EXPECT().
+					AddUserRegistered(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
 			wantErr: errFailed,
@@ -856,6 +884,7 @@ func expectTransaction(s testService) {
 						Users:         s.users,
 						RefreshTokens: s.tokens,
 						Sessions:      s.sessions,
+						Outbox:        s.outbox,
 					},
 				)
 			},
@@ -905,6 +934,17 @@ func expectPersistence(s testService) {
 				assert.Equal(s.t, sessionID, rt.SessionID)
 				assert.Equal(s.t, refreshFingerprint, rt.Hash)
 				assert.Equal(s.t, fixedNow, rt.IssuedAt)
+
+				return nil
+			},
+		)
+
+	s.outbox.EXPECT().
+		AddUserRegistered(mock.Anything, mock.Anything).
+		RunAndReturn(
+			func(_ context.Context, e user.Registered) error {
+				assert.Equal(s.t, userID, e.UserID)
+				assert.Equal(s.t, fixedNow, e.RegisteredAt)
 
 				return nil
 			},
