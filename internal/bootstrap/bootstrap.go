@@ -13,19 +13,20 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	ppostgres "github.com/dz-market/platform/database/postgres"
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
-	"github.com/dz-market/svc-auth/internal/infrastructure/clock"
+	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 	"github.com/dz-market/svc-auth/internal/infrastructure/security/argon2id"
 	"github.com/dz-market/svc-auth/internal/infrastructure/security/jwt"
 	"github.com/dz-market/svc-auth/internal/infrastructure/security/opaque"
+	"github.com/dz-market/svc-auth/internal/worker/outbox"
 )
 
 func Run(ctx context.Context, version string) error {
@@ -73,6 +74,20 @@ func Run(ctx context.Context, version string) error {
 	}
 
 	defer db.Close()
+
+	kafkaClient, err := kafka.NewClient(
+		kafka.Options{
+			Brokers:         cfg.Kafka.Brokers,
+			ClientID:        cfg.ServiceName,
+			DeliveryTimeout: cfg.Kafka.DeliveryTimeout,
+			Log:             log,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("kafka: %w", err)
+	}
+
+	defer kafkaClient.Close()
 
 	key, err := jwt.LoadKeyPair(cfg.Auth.Access.PrivateKeyPath, cfg.Auth.Access.PublicKeyPath)
 	if err != nil {
@@ -127,13 +142,12 @@ func Run(ctx context.Context, version string) error {
 		},
 	)
 
-	systemClock := clock.System{}
-
 	newAuthRepos := func(q ppostgres.Querier) auth.Repositories {
 		return auth.Repositories{
 			Users:         postgres.NewUserRepository(q),
 			RefreshTokens: postgres.NewRefreshTokenRepository(q),
 			Sessions:      postgres.NewSessionRepository(q),
+			Outbox:        postgres.NewOutboxRepository(q),
 		}
 	}
 
@@ -144,10 +158,25 @@ func Run(ctx context.Context, version string) error {
 			Hasher:            hasher,
 			AccessTokenIssuer: accessTokenIssuer,
 			RefreshGenerator:  refreshTokenGenerator,
-			Clock:             systemClock,
 			AccessTokenTTL:    cfg.Auth.Access.TTL,
 			SessionTTL:        cfg.Auth.Session.TTL,
 			Log:               log,
+		},
+	)
+
+	relay := outbox.New(
+		outbox.Options{
+			UoW: ppostgres.NewUnitOfWork(
+				db, func(q ppostgres.Querier) outbox.Store {
+					return postgres.NewOutboxRepository(q)
+				},
+			),
+			Publisher:    kafka.NewPublisher(kafkaClient),
+			PollInterval: cfg.Outbox.PollInterval,
+			BatchSize:    cfg.Outbox.BatchSize,
+			BatchTimeout: cfg.Outbox.BatchTimeout,
+			MaxAttempts:  cfg.Outbox.MaxAttempts,
+			Log:          log,
 		},
 	)
 
@@ -181,7 +210,6 @@ func Run(ctx context.Context, version string) error {
 		srv.Registrar(), handler.NewAuth(
 			handler.Options{
 				Service: authService,
-				Clock:   systemClock,
 				Log:     log,
 			},
 		),
@@ -207,6 +235,21 @@ func Run(ctx context.Context, version string) error {
 	g.Go(
 		func() error {
 			return srv.Run(ctx)
+		},
+	)
+
+	g.Go(
+		func() error {
+			kafka.EnsureTopics(
+				ctx, kafkaClient, []kafka.Topic{
+					{
+						Name:       kafka.TopicUserRegistered,
+						Partitions: cfg.Kafka.Topics.UserRegistered.Partitions,
+					},
+				}, log,
+			)
+
+			return relay.Run(ctx)
 		},
 	)
 

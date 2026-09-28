@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/identity"
@@ -19,7 +20,6 @@ import (
 
 type Options struct {
 	Service AuthService
-	Clock   Clock
 	Log     *slog.Logger
 }
 
@@ -27,14 +27,12 @@ type Auth struct {
 	authv1.UnimplementedAuthServiceServer
 
 	service AuthService
-	clock   Clock
 	log     *slog.Logger
 }
 
 func NewAuth(opts Options) *Auth {
 	return &Auth{
 		service: opts.Service,
-		clock:   opts.Clock,
 		log:     opts.Log,
 	}
 }
@@ -50,7 +48,7 @@ func (h *Auth) Register(ctx context.Context, req *authv1.RegisterRequest) (*auth
 		return nil, h.toStatus(ctx, err)
 	}
 
-	return mapper.ToRegisterResponse(out, h.clock.Now()), nil
+	return mapper.ToRegisterResponse(out, time.Now().UTC()), nil
 }
 
 func (h *Auth) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
@@ -64,7 +62,7 @@ func (h *Auth) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.Log
 		return nil, h.toStatus(ctx, err)
 	}
 
-	return mapper.ToLoginResponse(out, h.clock.Now()), nil
+	return mapper.ToLoginResponse(out, time.Now().UTC()), nil
 }
 
 func (h *Auth) Refresh(ctx context.Context, req *authv1.RefreshRequest) (*authv1.RefreshResponse, error) {
@@ -77,7 +75,7 @@ func (h *Auth) Refresh(ctx context.Context, req *authv1.RefreshRequest) (*authv1
 		return nil, h.toStatus(ctx, err)
 	}
 
-	return mapper.ToRefreshResponse(out, h.clock.Now()), nil
+	return mapper.ToRefreshResponse(out, time.Now().UTC()), nil
 }
 
 func (h *Auth) Logout(ctx context.Context, _ *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {

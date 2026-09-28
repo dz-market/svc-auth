@@ -27,3 +27,8 @@ packages:
         config:
             recursive: true
             all: true
+
+    github.com/dz-market/svc-auth/internal/worker:
+        config:
+            recursive: true
+            all: true

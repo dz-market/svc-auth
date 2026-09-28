@@ -16,7 +16,7 @@ import (
 
 	pinterceptor "github.com/dz-market/platform/grpc/interceptor"
 	pserver "github.com/dz-market/platform/grpc/server"
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server/interceptor"
 )

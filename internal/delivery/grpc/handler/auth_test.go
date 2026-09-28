@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
+	"testing/synctest"
 	"time"
 	"uuid"
 
@@ -14,7 +15,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/v1"
+	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
@@ -40,7 +41,7 @@ const (
 
 //nolint:gochecknoglobals // test fixtures
 var (
-	fixedNow  = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	fixedNow  = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 	sessionID = uuid.NewV7()
 
 	errFailed = errors.New("failed")
@@ -49,7 +50,6 @@ var (
 type testHandler struct {
 	handler *handler.Auth
 	service *mocks.MockAuthService
-	clock   *mocks.MockClock
 }
 
 func newTestHandler(t *testing.T) testHandler {
@@ -57,13 +57,11 @@ func newTestHandler(t *testing.T) testHandler {
 
 	h := testHandler{
 		service: mocks.NewMockAuthService(t),
-		clock:   mocks.NewMockClock(t),
 	}
 
 	h.handler = handler.NewAuth(
 		handler.Options{
 			Service: h.service,
-			Clock:   h.clock,
 			Log:     slog.New(slog.DiscardHandler),
 		},
 	)
@@ -98,41 +96,41 @@ func authenticated(t *testing.T) context.Context {
 func TestHandler_Register(t *testing.T) {
 	t.Parallel()
 
-	h := newTestHandler(t)
+	synctest.Test(
+		t, func(t *testing.T) {
+			h := newTestHandler(t)
 
-	accessToken, refreshToken := tokens()
+			accessToken, refreshToken := tokens()
 
-	h.service.EXPECT().
-		Register(
-			mock.Anything, auth.RegisterInput{
-				Email:    email,
-				Password: password,
-			},
-		).
-		Return(
-			auth.RegisterOutput{
-				Access:  accessToken,
-				Refresh: refreshToken,
-			}, nil,
-		)
+			h.service.EXPECT().
+				Register(
+					mock.Anything, auth.RegisterInput{
+						Email:    email,
+						Password: password,
+					},
+				).
+				Return(
+					auth.RegisterOutput{
+						Access:  accessToken,
+						Refresh: refreshToken,
+					}, nil,
+				)
 
-	h.clock.EXPECT().
-		Now().
-		Return(fixedNow)
+			resp, err := h.handler.Register(
+				t.Context(), authv1.RegisterRequest_builder{
+					Email:    new(email),
+					Password: new(password),
+				}.Build(),
+			)
+			require.NoError(t, err)
 
-	resp, err := h.handler.Register(
-		t.Context(), authv1.RegisterRequest_builder{
-			Email:    new(email),
-			Password: new(password),
-		}.Build(),
+			assert.Equal(t, accessValue, resp.GetAccess().GetToken())
+			assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
+
+			assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
+			assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
+		},
 	)
-	require.NoError(t, err)
-
-	assert.Equal(t, accessValue, resp.GetAccess().GetToken())
-	assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
-
-	assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
-	assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
 }
 
 func TestHandler_RegisterErrors(t *testing.T) {
@@ -195,41 +193,41 @@ func TestHandler_RegisterErrors(t *testing.T) {
 func TestHandler_Login(t *testing.T) {
 	t.Parallel()
 
-	h := newTestHandler(t)
+	synctest.Test(
+		t, func(t *testing.T) {
+			h := newTestHandler(t)
 
-	accessToken, refreshToken := tokens()
+			accessToken, refreshToken := tokens()
 
-	h.service.EXPECT().
-		Login(
-			mock.Anything, auth.LoginInput{
-				Email:    email,
-				Password: password,
-			},
-		).
-		Return(
-			auth.LoginOutput{
-				Access:  accessToken,
-				Refresh: refreshToken,
-			}, nil,
-		)
+			h.service.EXPECT().
+				Login(
+					mock.Anything, auth.LoginInput{
+						Email:    email,
+						Password: password,
+					},
+				).
+				Return(
+					auth.LoginOutput{
+						Access:  accessToken,
+						Refresh: refreshToken,
+					}, nil,
+				)
 
-	h.clock.EXPECT().
-		Now().
-		Return(fixedNow)
+			resp, err := h.handler.Login(
+				t.Context(), authv1.LoginRequest_builder{
+					Email:    new(email),
+					Password: new(password),
+				}.Build(),
+			)
+			require.NoError(t, err)
 
-	resp, err := h.handler.Login(
-		t.Context(), authv1.LoginRequest_builder{
-			Email:    new(email),
-			Password: new(password),
-		}.Build(),
+			assert.Equal(t, accessValue, resp.GetAccess().GetToken())
+			assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
+
+			assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
+			assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
+		},
 	)
-	require.NoError(t, err)
-
-	assert.Equal(t, accessValue, resp.GetAccess().GetToken())
-	assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
-
-	assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
-	assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
 }
 
 func TestHandler_LoginErrors(t *testing.T) {
@@ -292,39 +290,39 @@ func TestHandler_LoginErrors(t *testing.T) {
 func TestHandler_Refresh(t *testing.T) {
 	t.Parallel()
 
-	h := newTestHandler(t)
+	synctest.Test(
+		t, func(t *testing.T) {
+			h := newTestHandler(t)
 
-	accessToken, refreshToken := tokens()
+			accessToken, refreshToken := tokens()
 
-	h.service.EXPECT().
-		Refresh(
-			mock.Anything, auth.RefreshInput{
-				RefreshToken: oldRefreshValue,
-			},
-		).
-		Return(
-			auth.RefreshOutput{
-				Access:  accessToken,
-				Refresh: refreshToken,
-			}, nil,
-		)
+			h.service.EXPECT().
+				Refresh(
+					mock.Anything, auth.RefreshInput{
+						RefreshToken: oldRefreshValue,
+					},
+				).
+				Return(
+					auth.RefreshOutput{
+						Access:  accessToken,
+						Refresh: refreshToken,
+					}, nil,
+				)
 
-	h.clock.EXPECT().
-		Now().
-		Return(fixedNow)
+			resp, err := h.handler.Refresh(
+				t.Context(), authv1.RefreshRequest_builder{
+					RefreshToken: new(oldRefreshValue),
+				}.Build(),
+			)
+			require.NoError(t, err)
 
-	resp, err := h.handler.Refresh(
-		t.Context(), authv1.RefreshRequest_builder{
-			RefreshToken: new(oldRefreshValue),
-		}.Build(),
+			assert.Equal(t, accessValue, resp.GetAccess().GetToken())
+			assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
+
+			assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
+			assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
+		},
 	)
-	require.NoError(t, err)
-
-	assert.Equal(t, accessValue, resp.GetAccess().GetToken())
-	assert.Equal(t, accessExpiresIn, resp.GetAccess().GetExpiresIn())
-
-	assert.Equal(t, refreshValue, resp.GetRefresh().GetToken())
-	assert.Equal(t, refreshExpiresIn, resp.GetRefresh().GetExpiresIn())
 }
 
 func TestHandler_RefreshErrors(t *testing.T) {

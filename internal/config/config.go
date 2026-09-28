@@ -13,6 +13,8 @@ type Config struct {
 
 	GRPC     GRPC     `yaml:"grpc"`
 	Postgres Postgres `yaml:"postgres"`
+	Kafka    Kafka    `yaml:"kafka"`
+	Outbox   Outbox   `yaml:"outbox"`
 	Auth     Auth     `yaml:"auth"`
 	Health   Health   `yaml:"health"`
 	Log      Log      `yaml:"log"`
@@ -40,6 +42,27 @@ type Postgres struct {
 	HealthCheckPeriod time.Duration `yaml:"health_check_period"`
 	ConnectTimeout    time.Duration `yaml:"connect_timeout"`
 	PingTimeout       time.Duration `yaml:"ping_timeout"`
+}
+
+type Kafka struct {
+	Brokers         []string      `validate:"required,min=1,dive,required" yaml:"brokers"`
+	DeliveryTimeout time.Duration `validate:"required"                     yaml:"delivery_timeout"`
+	Topics          Topics        `yaml:"topics"`
+}
+
+type Topics struct {
+	UserRegistered Topic `yaml:"user_registered"`
+}
+
+type Topic struct {
+	Partitions int32 `validate:"required,min=1" yaml:"partitions"`
+}
+
+type Outbox struct {
+	PollInterval time.Duration `validate:"required,min=100ms" yaml:"poll_interval"`
+	BatchSize    int           `validate:"required,min=1"     yaml:"batch_size"`
+	BatchTimeout time.Duration `validate:"required,min=1s"    yaml:"batch_timeout"`
+	MaxAttempts  int           `validate:"required,min=1"     yaml:"max_attempts"`
 }
 
 type Auth struct {

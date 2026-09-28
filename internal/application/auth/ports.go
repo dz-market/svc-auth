@@ -9,10 +9,6 @@ import (
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
-type Clock interface {
-	Now() time.Time
-}
-
 type UsersRepository interface {
 	Create(ctx context.Context, u user.User) error
 	ByEmail(ctx context.Context, email string) (user.User, error)
@@ -29,6 +25,10 @@ type SessionsRepository interface {
 	Create(ctx context.Context, s session.Session) error
 	ByID(ctx context.Context, id uuid.UUID) (session.Session, error)
 	Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error
+}
+
+type OutboxRepository interface {
+	AddUserRegistered(ctx context.Context, e user.Registered) error
 }
 
 type PasswordHasher interface {
@@ -49,6 +49,7 @@ type Repositories struct {
 	Users         UsersRepository
 	RefreshTokens RefreshTokensRepository
 	Sessions      SessionsRepository
+	Outbox        OutboxRepository
 }
 
 type UnitOfWork interface {
