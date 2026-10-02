@@ -5,12 +5,12 @@ go 1.27.1
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/dz-market/platform v0.3.1
-	github.com/dz-market/protobuf v0.3.0
+	github.com/dz-market/protobuf v0.4.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/stretchr/testify v1.12.1
-	github.com/twmb/franz-go v1.22.0
+	github.com/twmb/franz-go v1.22.1
 	github.com/twmb/franz-go/pkg/kadm v1.19.0
 	github.com/twmb/franz-go/plugin/kslog v1.0.0
 	golang.org/x/crypto v0.57.0
