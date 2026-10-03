@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"log/slog"
 	"time"
@@ -18,22 +19,31 @@ import (
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
+type PublicKey struct {
+	ID        string
+	Algorithm string
+	Key       *rsa.PublicKey
+}
+
 type Options struct {
-	Service AuthService
-	Log     *slog.Logger
+	Service    AuthService
+	PublicKeys []PublicKey
+	Log        *slog.Logger
 }
 
 type Auth struct {
 	authv1.UnimplementedAuthServiceServer
 
-	service AuthService
-	log     *slog.Logger
+	service    AuthService
+	publicKeys []PublicKey
+	log        *slog.Logger
 }
 
 func NewAuth(opts Options) *Auth {
 	return &Auth{
-		service: opts.Service,
-		log:     opts.Log,
+		service:    opts.Service,
+		publicKeys: opts.PublicKeys,
+		log:        opts.Log,
 	}
 }
 
@@ -95,6 +105,18 @@ func (h *Auth) Logout(ctx context.Context, _ *authv1.LogoutRequest) (*authv1.Log
 	}
 
 	return authv1.LogoutResponse_builder{}.Build(), nil
+}
+
+func (h *Auth) GetJwks(_ context.Context, _ *authv1.GetJwksRequest) (*authv1.GetJwksResponse, error) {
+	keys := make([]*authv1.Jwk, 0, len(h.publicKeys))
+
+	for _, key := range h.publicKeys {
+		keys = append(keys, mapper.ToJwk(key.ID, key.Algorithm, key.Key))
+	}
+
+	return authv1.GetJwksResponse_builder{
+		Keys: keys,
+	}.Build(), nil
 }
 
 func (h *Auth) toStatus(ctx context.Context, err error) error {
