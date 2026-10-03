@@ -5,7 +5,7 @@ go 1.27.1
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/dz-market/platform v0.3.1
-	github.com/dz-market/protobuf v0.3.0
+	github.com/dz-market/protobuf v0.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	github.com/jackc/pgx/v5 v5.11.0
