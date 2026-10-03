@@ -210,7 +210,14 @@ func Run(ctx context.Context, version string) error {
 		srv.Registrar(), handler.NewAuth(
 			handler.Options{
 				Service: authService,
-				Log:     log,
+				PublicKeys: []handler.PublicKey{
+					{
+						ID:        key.ID,
+						Algorithm: "RS256",
+						Key:       key.Public,
+					},
+				},
+				Log: log,
 			},
 		),
 	)
