@@ -1,6 +1,9 @@
 package mapper
 
 import (
+	"crypto/rsa"
+	"encoding/base64"
+	"math/big"
 	"time"
 
 	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
@@ -33,6 +36,17 @@ func ToToken(t auth.Token, now time.Time) *authv1.Token {
 	return authv1.Token_builder{
 		Token:     new(t.Value),
 		ExpiresIn: new(expiresIn(t.ExpiresAt, now)),
+	}.Build()
+}
+
+func ToJwk(id, alg string, key *rsa.PublicKey) *authv1.Jwk {
+	return authv1.Jwk_builder{
+		Kty: new("RSA"),
+		Use: new("sig"),
+		Kid: new(id),
+		Alg: new(alg),
+		N:   new(base64.RawURLEncoding.EncodeToString(key.N.Bytes())),
+		E:   new(base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.E)).Bytes())),
 	}.Build()
 }
 
