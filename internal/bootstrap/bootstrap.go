@@ -187,6 +187,7 @@ func Run(ctx context.Context, version string) error {
 		}, log,
 	)
 	checker.Register("postgres", db.Ping)
+	checker.Register("kafka", kafkaClient.Ping)
 
 	validator, err := protovalidate.New()
 	if err != nil {

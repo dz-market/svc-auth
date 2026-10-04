@@ -23,8 +23,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6N
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
-github.com/dz-market/platform v0.3.2 h1:5b15kKuXU4GHqHLa7gwXTQyqCvfsRY0jZsSwp4BigdQ=
-github.com/dz-market/platform v0.3.2/go.mod h1:jxB3b0sOIP/oHLScFsYEuvKZp2PDjT6Qaq2/VQhwTZ8=
+github.com/dz-market/platform v0.3.3 h1:BRTXoJuo3UVfH9jSc8my5Ke2cfAxiuAwfO2vS2naQt8=
+github.com/dz-market/platform v0.3.3/go.mod h1:jxB3b0sOIP/oHLScFsYEuvKZp2PDjT6Qaq2/VQhwTZ8=
 github.com/dz-market/protobuf v0.5.0 h1:ti3KEq3cB4xQmKws66y46L95xv55pilbUF2R+eQH+1E=
 github.com/dz-market/protobuf v0.5.0/go.mod h1:oUJzpuf8WfxCY6BXYduXHrCSgKuLCfKjnXS4sEHk+RI=
 github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=

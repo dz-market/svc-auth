@@ -7,12 +7,14 @@ import (
 	phealth "github.com/dz-market/platform/health"
 )
 
+type Checker = phealth.Checker
+
 type Options struct {
 	Period  time.Duration
 	Timeout time.Duration
 }
 
-func New(opts Options, log *slog.Logger) *phealth.Checker {
+func New(opts Options, log *slog.Logger) *Checker {
 	return phealth.New(
 		phealth.Options{
 			Period:  opts.Period,
