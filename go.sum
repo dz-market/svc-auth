@@ -25,8 +25,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/dz-market/platform v0.3.3 h1:BRTXoJuo3UVfH9jSc8my5Ke2cfAxiuAwfO2vS2naQt8=
 github.com/dz-market/platform v0.3.3/go.mod h1:jxB3b0sOIP/oHLScFsYEuvKZp2PDjT6Qaq2/VQhwTZ8=
-github.com/dz-market/protobuf v0.5.0 h1:ti3KEq3cB4xQmKws66y46L95xv55pilbUF2R+eQH+1E=
-github.com/dz-market/protobuf v0.5.0/go.mod h1:oUJzpuf8WfxCY6BXYduXHrCSgKuLCfKjnXS4sEHk+RI=
+github.com/dz-market/protobuf v0.5.1 h1:cQsbtrI6NQeOhXf4q2Lq5/Su8Ik3bKa/ZFsP9ti7yX0=
+github.com/dz-market/protobuf v0.5.1/go.mod h1:oUJzpuf8WfxCY6BXYduXHrCSgKuLCfKjnXS4sEHk+RI=
 github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
