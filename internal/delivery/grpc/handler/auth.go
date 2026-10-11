@@ -96,11 +96,12 @@ func (h *Auth) Logout(ctx context.Context, _ *authv1.LogoutRequest) (*authv1.Log
 		return nil, status.Errorf(codes.Unauthenticated, "invalid access token")
 	}
 
-	if err := h.service.Logout(
+	err := h.service.Logout(
 		ctx, auth.LogoutInput{
 			SessionID: id.SessionID,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return nil, h.toStatus(ctx, err)
 	}
 

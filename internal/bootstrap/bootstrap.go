@@ -33,7 +33,7 @@ func Run(ctx context.Context, version string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	cfg, err := config.Load()
+	cfg, err := config.Load(ctx)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

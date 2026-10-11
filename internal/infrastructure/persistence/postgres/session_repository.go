@@ -46,9 +46,10 @@ func (r *SessionRepository) ByID(ctx context.Context, id uuid.UUID) (session.Ses
 
 	var s session.Session
 
-	if err := r.q.
+	err := r.q.
 		QueryRow(ctx, query, id).
-		Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.ExpiresAt, &s.RevokedAt); err != nil {
+		Scan(&s.ID, &s.UserID, &s.CreatedAt, &s.ExpiresAt, &s.RevokedAt)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return session.Session{}, session.ErrSessionNotFound
 		}
