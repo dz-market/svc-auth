@@ -1,6 +1,6 @@
 module github.com/dz-market/svc-auth
 
-go 1.27.1
+go 1.27.2
 
 require (
 	buf.build/go/protovalidate v1.4.0
