@@ -77,7 +77,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 		return RegisterOutput{}, err
 	}
 
-	if err := s.uow.Do(
+	err = s.uow.Do(
 		ctx, func(r Repositories) error {
 			if err := r.Users.Create(ctx, u); err != nil {
 				return err
@@ -93,7 +93,8 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 
 			return r.Outbox.AddUserRegistered(ctx, user.NewRegistered(u))
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return RegisterOutput{}, err
 	}
 
@@ -145,7 +146,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		return LoginOutput{}, err
 	}
 
-	if err := s.uow.Do(
+	err = s.uow.Do(
 		ctx, func(r Repositories) error {
 			if err := r.Sessions.Create(ctx, issued.session); err != nil {
 				return err
@@ -153,7 +154,8 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 
 			return r.RefreshTokens.Create(ctx, issued.refreshToken)
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return LoginOutput{}, err
 	}
 
@@ -208,7 +210,7 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 		return RefreshOutput{}, err
 	}
 
-	if err := s.uow.Do(
+	err = s.uow.Do(
 		ctx, func(r Repositories) error {
 			marked, err := r.RefreshTokens.MarkUsed(ctx, rt.ID, now)
 			if err != nil {
@@ -221,7 +223,8 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 
 			return r.RefreshTokens.Create(ctx, issued.refreshToken)
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return RefreshOutput{}, err
 	}
 
@@ -238,7 +241,7 @@ type LogoutInput struct {
 func (s *Service) Logout(ctx context.Context, in LogoutInput) error {
 	now := time.Now().UTC()
 
-	if err := s.uow.Do(
+	err := s.uow.Do(
 		ctx, func(r Repositories) error {
 			if err := r.Sessions.Revoke(ctx, in.SessionID, now); err != nil {
 				return err
@@ -246,7 +249,8 @@ func (s *Service) Logout(ctx context.Context, in LogoutInput) error {
 
 			return r.RefreshTokens.MarkUsedBySessionID(ctx, in.SessionID, now)
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 

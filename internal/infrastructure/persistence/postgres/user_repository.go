@@ -48,9 +48,10 @@ func (r *UserRepository) ByEmail(ctx context.Context, email string) (user.User, 
 
 	var u user.User
 
-	if err := r.q.
+	err := r.q.
 		QueryRow(ctx, query, email).
-		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return user.User{}, user.ErrNotFound
 		}

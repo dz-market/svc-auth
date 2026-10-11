@@ -46,9 +46,10 @@ func (r *RefreshTokenRepository) ByHash(ctx context.Context, hash []byte) (sessi
 
 	var rt session.RefreshToken
 
-	if err := r.q.
+	err := r.q.
 		QueryRow(ctx, query, hash).
-		Scan(&rt.ID, &rt.SessionID, &rt.Hash, &rt.IssuedAt, &rt.UsedAt); err != nil {
+		Scan(&rt.ID, &rt.SessionID, &rt.Hash, &rt.IssuedAt, &rt.UsedAt)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return session.RefreshToken{}, session.ErrRefreshTokenNotFound
 		}
