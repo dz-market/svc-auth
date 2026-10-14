@@ -101,14 +101,14 @@ func newTestService(t *testing.T) testService {
 
 	s.service = auth.New(
 		auth.Options{
-			Repos:             repos,
-			UoW:               s.uow,
-			Hasher:            s.hasher,
-			AccessTokenIssuer: s.issuer,
-			RefreshGenerator:  s.generator,
-			AccessTokenTTL:    accessTTL,
-			SessionTTL:        sessionTTL,
-			Log:               slog.New(slog.DiscardHandler),
+			Repos:                 repos,
+			UoW:                   s.uow,
+			PasswordHasher:        s.hasher,
+			AccessTokenIssuer:     s.issuer,
+			RefreshTokenGenerator: s.generator,
+			AccessTokenTTL:        accessTTL,
+			SessionTTL:            sessionTTL,
+			Log:                   slog.New(slog.DiscardHandler),
 		},
 	)
 
