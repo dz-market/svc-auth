@@ -60,7 +60,6 @@ func (a app) newChecker() *health.Checker {
 	)
 
 	checker.Register("postgres", a.postgres.Ping)
-	checker.Register("kafka", a.kafkaProducerClient.Ping)
 
 	return checker
 }
