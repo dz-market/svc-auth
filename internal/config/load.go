@@ -5,10 +5,33 @@ import (
 	"fmt"
 
 	pconfig "github.com/dz-market/platform/config"
+	"github.com/dz-market/platform/vault"
 )
 
-func Load(ctx context.Context) (Config, error) {
-	cfg, err := pconfig.Load[Config](ctx)
+const envPath = ".env"
+
+func Load(ctx context.Context, opts ...pconfig.Option) (Config, error) {
+	env, err := pconfig.LoadEnv(envPath)
+	if err != nil {
+		return Config{}, fmt.Errorf("load env: %w", err)
+	}
+
+	vaultCfg, err := vault.ConfigFromEnv(env)
+	if err != nil {
+		return Config{}, fmt.Errorf("vault config: %w", err)
+	}
+
+	vaultClient, err := vault.New(ctx, vaultCfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("vault: %w", err)
+	}
+
+	defaultOpts := []pconfig.Option{
+		pconfig.WithEnvPath(envPath),
+		pconfig.WithResolver("vault", vault.NewResolver(vaultClient)),
+	}
+
+	cfg, err := pconfig.Load[Config](ctx, append(defaultOpts, opts...)...)
 	if err != nil {
 		return cfg, err
 	}

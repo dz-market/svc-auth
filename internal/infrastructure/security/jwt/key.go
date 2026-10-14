@@ -6,9 +6,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
-	"os"
 )
 
 const MinKeyBits = 2048
@@ -19,81 +19,30 @@ type KeyPair struct {
 	Public  *rsa.PublicKey
 }
 
-func LoadKeyPair(privatePath, publicPath string) (KeyPair, error) {
-	private, err := loadPrivate(privatePath)
-	if err != nil {
-		return KeyPair{}, err
+func ParseKeyPair(privatePEM string) (KeyPair, error) {
+	block, _ := pem.Decode([]byte(privatePEM))
+	if block == nil {
+		return KeyPair{}, errors.New("private key: no pem block")
 	}
 
-	public, err := loadPublic(publicPath)
+	private, err := parseRSAPrivate(block)
 	if err != nil {
-		return KeyPair{}, err
+		return KeyPair{}, fmt.Errorf("private key: %w", err)
 	}
 
-	if !private.PublicKey.Equal(public) {
-		return KeyPair{}, fmt.Errorf("key mismatch: %s is not the public half of %s", publicPath, privatePath)
+	if bits := private.N.BitLen(); bits < MinKeyBits {
+		return KeyPair{}, fmt.Errorf("private key: rsa key is %d bits, minimum is %d", bits, MinKeyBits)
+	}
+
+	if err := private.Validate(); err != nil {
+		return KeyPair{}, fmt.Errorf("private key: validate rsa key: %w", err)
 	}
 
 	return KeyPair{
-		ID:      thumbprint(public),
+		ID:      thumbprint(&private.PublicKey),
 		Private: private,
-		Public:  public,
+		Public:  &private.PublicKey,
 	}, nil
-}
-
-func loadPrivate(path string) (*rsa.PrivateKey, error) {
-	block, err := readPEM(path)
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := parseRSAPrivate(block)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-
-	if bits := key.N.BitLen(); bits < MinKeyBits {
-		return nil, fmt.Errorf("%s: rsa key is %d bits, minimum is %d", path, bits, MinKeyBits)
-	}
-
-	if err := key.Validate(); err != nil {
-		return nil, fmt.Errorf("%s: validate rsa key: %w", path, err)
-	}
-
-	return key, nil
-}
-
-func loadPublic(path string) (*rsa.PublicKey, error) {
-	block, err := readPEM(path)
-	if err != nil {
-		return nil, err
-	}
-
-	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("%s: parse public key: %w", path, err)
-	}
-
-	pub, ok := parsed.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("%s: key type %T is not rsa", path, parsed)
-	}
-
-	return pub, nil
-}
-
-func readPEM(path string) (*pem.Block, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read key: %w", err)
-	}
-
-	block, _ := pem.Decode(raw)
-	if block == nil {
-		return nil, fmt.Errorf("%s: no pem block", path)
-	}
-
-	return block, nil
 }
 
 func parseRSAPrivate(block *pem.Block) (*rsa.PrivateKey, error) {

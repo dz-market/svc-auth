@@ -73,11 +73,10 @@ type Auth struct {
 }
 
 type Access struct {
-	TTL            time.Duration `validate:"required"                     yaml:"ttl"`
-	Issuer         string        `validate:"required"                     yaml:"issuer"`
-	Audience       []string      `validate:"required,min=1,dive,required" yaml:"audience"`
-	PrivateKeyPath string        `validate:"required"                     yaml:"private_key_path"`
-	PublicKeyPath  string        `validate:"required"                     yaml:"public_key_path"`
+	TTL        time.Duration `validate:"required"                     yaml:"ttl"`
+	Issuer     string        `validate:"required"                     yaml:"issuer"`
+	Audience   []string      `validate:"required,min=1,dive,required" yaml:"audience"`
+	PrivateKey string        `validate:"required"                     yaml:"private_key"`
 }
 
 type Refresh struct {
