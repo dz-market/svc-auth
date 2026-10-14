@@ -25,6 +25,7 @@ func (a app) newGRPCServer(tokenProviders tokenProviders, authService *auth.Serv
 			MaxRecvMsgSize:        a.cfg.GRPC.MaxRecvMsgSize.Bytes(),
 			MaxConnectionAge:      a.cfg.GRPC.Keepalive.MaxConnectionAge,
 			MaxConnectionAgeGrace: a.cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
+			ShutdownTimeout:       a.cfg.ShutdownTimeout,
 			Validator:             validator,
 			Verifier:              tokenProviders.accessTokenVerifier,
 		},
