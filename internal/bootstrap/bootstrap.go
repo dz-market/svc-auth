@@ -2,32 +2,28 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 
-	"buf.build/go/protovalidate"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"golang.org/x/sync/errgroup"
 
 	ppostgres "github.com/dz-market/platform/database/postgres"
-	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
-	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/config"
-	"github.com/dz-market/svc-auth/internal/delivery/grpc/handler"
-	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
-	"github.com/dz-market/svc-auth/internal/infrastructure/observability/health"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
-	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
-	"github.com/dz-market/svc-auth/internal/infrastructure/security/argon2id"
-	"github.com/dz-market/svc-auth/internal/infrastructure/security/jwt"
-	"github.com/dz-market/svc-auth/internal/infrastructure/security/opaque"
-	"github.com/dz-market/svc-auth/internal/worker/outbox"
 )
+
+type app struct {
+	cfg                 config.Config
+	log                 *slog.Logger
+	postgres            *ppostgres.DB
+	kafkaProducerClient *kgo.Client
+}
 
 func Run(ctx context.Context, version string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -35,7 +31,7 @@ func Run(ctx context.Context, version string) error {
 
 	cfg, err := config.Load(ctx)
 	if err != nil {
-		return fmt.Errorf("load config: %w", err)
+		return err
 	}
 
 	log := logger.New(
@@ -46,6 +42,7 @@ func Run(ctx context.Context, version string) error {
 			Version: version,
 		},
 	)
+
 	log.DebugContext(ctx, "configuration loaded")
 
 	log.InfoContext(
@@ -56,172 +53,45 @@ func Run(ctx context.Context, version string) error {
 		slog.String("log_level", cfg.Log.Level.String()),
 	)
 
-	db, err := postgres.New(
-		ctx, postgres.Options{
-			AppName:           cfg.ServiceName,
-			DSN:               cfg.Postgres.DSN,
-			MaxConns:          cfg.Postgres.MaxConns,
-			MinConns:          cfg.Postgres.MinConns,
-			MaxConnLifetime:   cfg.Postgres.MaxConnLifetime,
-			MaxConnIdleTime:   cfg.Postgres.MaxConnIdleTime,
-			HealthCheckPeriod: cfg.Postgres.HealthCheckPeriod,
-			ConnectTimeout:    cfg.Postgres.ConnectTimeout,
-			PingTimeout:       cfg.Postgres.PingTimeout,
-		}, log,
-	)
+	postgres, err := newPostgres(ctx, cfg, log)
 	if err != nil {
-		return fmt.Errorf("postgres: %w", err)
+		return err
 	}
 
-	defer db.Close()
+	defer postgres.Close()
 
-	kafkaClient, err := kafka.NewClient(
-		kafka.Options{
-			Brokers:         cfg.Kafka.Brokers,
-			ClientID:        cfg.ServiceName,
-			DeliveryTimeout: cfg.Kafka.DeliveryTimeout,
-			Log:             log,
-		},
-	)
+	kafkaProducerClient, err := newKafkaProducerClient(cfg, log)
 	if err != nil {
-		return fmt.Errorf("kafka: %w", err)
+		return err
 	}
 
-	defer kafkaClient.Close()
+	defer kafkaProducerClient.Close()
 
-	key, err := jwt.LoadKeyPair(cfg.Auth.Access.PrivateKeyPath, cfg.Auth.Access.PublicKeyPath)
+	tokenProviders, err := newTokenProviders(cfg.Auth)
 	if err != nil {
-		return fmt.Errorf("load access key: %w", err)
+		return err
 	}
 
 	log.InfoContext(
 		ctx, "access key loaded",
-		slog.String("kid", key.ID),
+		slog.String("kid", tokenProviders.key.ID),
 	)
 
-	accessTokenIssuer, err := jwt.NewIssuer(
-		jwt.IssuerOptions{
-			Key:      key,
-			Issuer:   cfg.Auth.Access.Issuer,
-			Audience: cfg.Auth.Access.Audience,
-		},
-	)
+	a := app{
+		cfg:                 cfg,
+		log:                 log,
+		postgres:            postgres,
+		kafkaProducerClient: kafkaProducerClient,
+	}
+
+	authService := a.newAuthService(tokenProviders)
+	relay := a.newRelay()
+	checker := a.newChecker()
+
+	grpcServer, err := a.newGRPCServer(tokenProviders, authService)
 	if err != nil {
-		return fmt.Errorf("access token issuer: %w", err)
+		return err
 	}
-
-	accessTokenVerifier, err := jwt.NewVerifier(
-		jwt.VerifierOptions{
-			Key:      key,
-			Issuer:   cfg.Auth.Access.Issuer,
-			Audience: cfg.Auth.Access.Audience,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("access token verifier: %w", err)
-	}
-
-	refreshTokenGenerator, err := opaque.New(
-		opaque.Options{
-			Length: cfg.Auth.Refresh.Length,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("refresh token generator: %w", err)
-	}
-
-	hasher := argon2id.New(
-		argon2id.Params{
-			//nolint:gosec // bounded by the validation on the config field
-			MemoryKiB:   uint32(cfg.Auth.Password.Argon2ID.Memory.KiB()),
-			Iterations:  cfg.Auth.Password.Argon2ID.Iterations,
-			Parallelism: cfg.Auth.Password.Argon2ID.Parallelism,
-			SaltLength:  cfg.Auth.Password.Argon2ID.SaltLength,
-			KeyLength:   cfg.Auth.Password.Argon2ID.KeyLength,
-			MaxInFlight: cfg.Auth.Password.Argon2ID.MaxInFlight,
-		},
-	)
-
-	newAuthRepos := func(q ppostgres.Querier) auth.Repositories {
-		return auth.Repositories{
-			Users:         postgres.NewUserRepository(q),
-			RefreshTokens: postgres.NewRefreshTokenRepository(q),
-			Sessions:      postgres.NewSessionRepository(q),
-			Outbox:        postgres.NewOutboxRepository(q),
-		}
-	}
-
-	authService := auth.New(
-		auth.Options{
-			Repos:             newAuthRepos(db),
-			UoW:               ppostgres.NewUnitOfWork(db, newAuthRepos),
-			Hasher:            hasher,
-			AccessTokenIssuer: accessTokenIssuer,
-			RefreshGenerator:  refreshTokenGenerator,
-			AccessTokenTTL:    cfg.Auth.Access.TTL,
-			SessionTTL:        cfg.Auth.Session.TTL,
-			Log:               log,
-		},
-	)
-
-	relay := outbox.New(
-		outbox.Options{
-			UoW: ppostgres.NewUnitOfWork(
-				db, func(q ppostgres.Querier) outbox.Store {
-					return postgres.NewOutboxRepository(q)
-				},
-			),
-			Publisher:    kafka.NewPublisher(kafkaClient),
-			PollInterval: cfg.Outbox.PollInterval,
-			BatchSize:    cfg.Outbox.BatchSize,
-			BatchTimeout: cfg.Outbox.BatchTimeout,
-			MaxAttempts:  cfg.Outbox.MaxAttempts,
-			Log:          log,
-		},
-	)
-
-	checker := health.New(
-		health.Options{
-			Period:  cfg.Health.Period,
-			Timeout: cfg.Health.Timeout,
-		}, log,
-	)
-	checker.Register("postgres", db.Ping)
-	checker.Register("kafka", kafkaClient.Ping)
-
-	validator, err := protovalidate.New()
-	if err != nil {
-		return fmt.Errorf("protovalidate: %w", err)
-	}
-
-	srv := server.New(
-		server.Options{
-			Addr:                  cfg.GRPC.Addr,
-			Reflection:            cfg.GRPC.Reflection,
-			MaxRecvMsgSize:        cfg.GRPC.MaxRecvMsgSize.Bytes(),
-			MaxConnectionAge:      cfg.GRPC.Keepalive.MaxConnectionAge,
-			MaxConnectionAgeGrace: cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
-			Validator:             validator,
-			Verifier:              accessTokenVerifier,
-		},
-		log,
-	)
-
-	authv1.RegisterAuthServiceServer(
-		srv.Registrar(), handler.NewAuth(
-			handler.Options{
-				Service: authService,
-				PublicKeys: []handler.PublicKey{
-					{
-						ID:        key.ID,
-						Algorithm: "RS256",
-						Key:       key.Public,
-					},
-				},
-				Log: log,
-			},
-		),
-	)
 
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -234,7 +104,7 @@ func Run(ctx context.Context, version string) error {
 						slog.Bool("healthy", healthy),
 					)
 
-					srv.SetHealthy(healthy)
+					grpcServer.SetHealthy(healthy)
 				},
 			)
 		},
@@ -242,14 +112,14 @@ func Run(ctx context.Context, version string) error {
 
 	g.Go(
 		func() error {
-			return srv.Run(ctx)
+			return grpcServer.Run(ctx)
 		},
 	)
 
 	g.Go(
 		func() error {
 			kafka.EnsureTopics(
-				ctx, kafkaClient, []kafka.Topic{
+				ctx, kafkaProducerClient, []kafka.Topic{
 					{
 						Name:       kafka.TopicUserRegistered,
 						Partitions: cfg.Kafka.Topics.UserRegistered.Partitions,
