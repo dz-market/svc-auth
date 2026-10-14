@@ -9,15 +9,15 @@ import (
 	"github.com/twmb/franz-go/plugin/kslog"
 )
 
-type Options struct {
+type ProducerOptions struct {
 	Brokers         []string
 	ClientID        string
 	DeliveryTimeout time.Duration
 	Log             *slog.Logger
 }
 
-func NewClient(opts Options) (*kgo.Client, error) {
-	cl, err := kgo.NewClient(
+func NewProducerClient(opts ProducerOptions) (*kgo.Client, error) {
+	client, err := kgo.NewClient(
 		kgo.SeedBrokers(opts.Brokers...),
 		kgo.ClientID(opts.ClientID),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
@@ -27,8 +27,8 @@ func NewClient(opts Options) (*kgo.Client, error) {
 		kgo.WithLogger(kslog.New(opts.Log)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("kafka client: %w", err)
+		return nil, fmt.Errorf("kafka producer client: %w", err)
 	}
 
-	return cl, nil
+	return client, nil
 }

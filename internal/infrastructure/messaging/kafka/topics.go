@@ -21,8 +21,8 @@ type Topic struct {
 	Partitions int32
 }
 
-func EnsureTopics(ctx context.Context, cl *kgo.Client, topics []Topic, log *slog.Logger) {
-	adm := kadm.NewClient(cl)
+func EnsureTopics(ctx context.Context, client *kgo.Client, topics []Topic, log *slog.Logger) {
+	adm := kadm.NewClient(client)
 
 	for {
 		err := createTopics(ctx, adm, topics)
