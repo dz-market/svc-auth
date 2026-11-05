@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	ServiceName     string        `validate:"required" yaml:"service_name"`
-	ShutdownTimeout time.Duration `validate:"required" yaml:"shutdown_timeout"`
+	ServiceName     string        `validate:"required"      yaml:"service_name"`
+	ShutdownTimeout time.Duration `validate:"required,gt=0" yaml:"shutdown_timeout"`
 
 	GRPC     GRPC     `yaml:"grpc"`
 	Postgres Postgres `yaml:"postgres"`
@@ -29,8 +29,8 @@ type GRPC struct {
 }
 
 type Keepalive struct {
-	MaxConnectionAge      time.Duration `validate:"required" yaml:"max_connection_age"`
-	MaxConnectionAgeGrace time.Duration `validate:"required" yaml:"max_connection_age_grace"`
+	MaxConnectionAge      time.Duration `validate:"required,gt=0" yaml:"max_connection_age"`
+	MaxConnectionAgeGrace time.Duration `validate:"required,gt=0" yaml:"max_connection_age_grace"`
 }
 
 type Postgres struct {
@@ -46,7 +46,7 @@ type Postgres struct {
 
 type Kafka struct {
 	Brokers         []string      `validate:"required,min=1,dive,required" yaml:"brokers"`
-	DeliveryTimeout time.Duration `validate:"required"                     yaml:"delivery_timeout"`
+	DeliveryTimeout time.Duration `validate:"required,gt=0"                yaml:"delivery_timeout"`
 	Topics          Topics        `yaml:"topics"`
 }
 
@@ -73,10 +73,9 @@ type Auth struct {
 }
 
 type Access struct {
-	TTL        time.Duration `validate:"required"                     yaml:"ttl"`
-	Issuer     string        `validate:"required"                     yaml:"issuer"`
-	Audience   []string      `validate:"required,min=1,dive,required" yaml:"audience"`
-	PrivateKey string        `validate:"required"                     yaml:"private_key"`
+	TTL           time.Duration `validate:"required,gt=0"                yaml:"ttl"`
+	Issuer        string        `validate:"required"                     yaml:"issuer"`
+	Audience      []string      `validate:"required,min=1,dive,required" yaml:"audience"`
 	PrivateKeyPEM string        `validate:"required"                     yaml:"private_key"`
 }
 
@@ -85,7 +84,7 @@ type Refresh struct {
 }
 
 type Session struct {
-	TTL time.Duration `validate:"required" yaml:"ttl"`
+	TTL time.Duration `validate:"required,gt=0" yaml:"ttl"`
 }
 
 type Password struct {
@@ -102,8 +101,8 @@ type Argon2ID struct {
 }
 
 type Health struct {
-	Period  time.Duration `validate:"required" yaml:"period"`
-	Timeout time.Duration `validate:"required" yaml:"timeout"`
+	Period  time.Duration `validate:"required,gt=0" yaml:"period"`
+	Timeout time.Duration `validate:"required,gt=0" yaml:"timeout"`
 }
 
 type Log struct {
