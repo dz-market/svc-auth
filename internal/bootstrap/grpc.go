@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"buf.build/go/protovalidate"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 
 	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server"
 )
 
-func (a app) newGRPCServer(tokenProviders tokenProviders, authService *auth.Service) (*server.Server, error) {
+func (a app) newGRPCServer(tokens tokenProviders, authService *auth.Service) (*server.Server, error) {
 	validator, err := protovalidate.New()
 	if err != nil {
 		return nil, fmt.Errorf("protovalidate: %w", err)
@@ -27,7 +28,7 @@ func (a app) newGRPCServer(tokenProviders tokenProviders, authService *auth.Serv
 			MaxConnectionAgeGrace: a.cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
 			ShutdownTimeout:       a.cfg.ShutdownTimeout,
 			Validator:             validator,
-			Verifier:              tokenProviders.accessTokenVerifier,
+			Verifier:              tokens.accessTokenVerifier,
 		},
 		a.log,
 	)
@@ -38,9 +39,9 @@ func (a app) newGRPCServer(tokenProviders tokenProviders, authService *auth.Serv
 				Service: authService,
 				PublicKeys: []handler.PublicKey{
 					{
-						ID:        tokenProviders.key.ID,
-						Algorithm: "RS256",
-						Key:       tokenProviders.key.Public,
+						ID:        tokens.accessKey.ID,
+						Algorithm: jwtgo.SigningMethodRS256.Alg(),
+						Key:       tokens.accessKey.Public,
 					},
 				},
 				Log: a.log,

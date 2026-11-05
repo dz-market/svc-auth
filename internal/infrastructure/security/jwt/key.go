@@ -11,7 +11,7 @@ import (
 	"math/big"
 )
 
-const MinKeyBits = 2048
+const minKeyBits = 2048
 
 type KeyPair struct {
 	ID      string
@@ -30,8 +30,8 @@ func ParseKeyPair(privatePEM string) (KeyPair, error) {
 		return KeyPair{}, fmt.Errorf("private key: %w", err)
 	}
 
-	if bits := private.N.BitLen(); bits < MinKeyBits {
-		return KeyPair{}, fmt.Errorf("private key: rsa key is %d bits, minimum is %d", bits, MinKeyBits)
+	if bits := private.N.BitLen(); bits < minKeyBits {
+		return KeyPair{}, fmt.Errorf("private key: rsa key is %d bits, minimum is %d", bits, minKeyBits)
 	}
 
 	if err := private.Validate(); err != nil {

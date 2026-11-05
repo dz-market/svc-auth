@@ -67,14 +67,14 @@ func Run(ctx context.Context, version string) error {
 
 	defer kafkaProducerClient.Close()
 
-	tokenProviders, err := newTokenProviders(cfg.Auth)
+	tokens, err := newTokenProviders(cfg.Auth)
 	if err != nil {
 		return err
 	}
 
 	log.InfoContext(
 		ctx, "access key loaded",
-		slog.String("kid", tokenProviders.key.ID),
+		slog.String("kid", tokens.accessKey.ID),
 	)
 
 	a := app{
@@ -84,11 +84,11 @@ func Run(ctx context.Context, version string) error {
 		kafkaProducerClient: kafkaProducerClient,
 	}
 
-	authService := a.newAuthService(tokenProviders)
+	authService := a.newAuthService(tokens)
 	relay := a.newRelay()
 	checker := a.newChecker()
 
-	grpcServer, err := a.newGRPCServer(tokenProviders, authService)
+	grpcServer, err := a.newGRPCServer(tokens, authService)
 	if err != nil {
 		return err
 	}
