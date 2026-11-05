@@ -10,7 +10,7 @@ import (
 
 const envPath = ".env"
 
-func Load(ctx context.Context, opts ...pconfig.Option) (Config, error) {
+func Load(ctx context.Context) (Config, error) {
 	env, err := pconfig.LoadEnv(envPath)
 	if err != nil {
 		return Config{}, fmt.Errorf("load env: %w", err)
@@ -26,12 +26,11 @@ func Load(ctx context.Context, opts ...pconfig.Option) (Config, error) {
 		return Config{}, fmt.Errorf("vault: %w", err)
 	}
 
-	defaultOpts := []pconfig.Option{
+	cfg, err := pconfig.Load[Config](
+		ctx,
 		pconfig.WithEnvPath(envPath),
 		pconfig.WithResolver("vault", vault.NewResolver(vaultClient)),
-	}
-
-	cfg, err := pconfig.Load[Config](ctx, append(defaultOpts, opts...)...)
+	)
 	if err != nil {
 		return cfg, err
 	}
