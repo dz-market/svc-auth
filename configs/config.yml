@@ -37,8 +37,7 @@ auth:
         ttl: 15m
         issuer: svc-auth
         audience: [marketplace]
-        private_key_path: "${env:ACCESS_PRIVATE_KEY_PATH}"
-        public_key_path: "${env:ACCESS_PUBLIC_KEY_PATH}"
+        private_key: "${vault:transit/export/signing-key/access-token#keys.1}"
     refresh:
         length: 32
     session:

@@ -1,4 +1,4 @@
-package kafka
+package producer
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 
 const headerEventID = "event-id"
 
-type Publisher struct {
-	cl *kgo.Client
+type Producer struct {
+	client *kgo.Client
 }
 
-func NewPublisher(cl *kgo.Client) *Publisher {
-	return &Publisher{
-		cl: cl,
+func New(client *kgo.Client) *Producer {
+	return &Producer{
+		client: client,
 	}
 }
 
-func (p *Publisher) Publish(ctx context.Context, msgs []outbox.Message) []outbox.Result {
+func (p *Producer) Publish(ctx context.Context, msgs []outbox.Message) []outbox.Result {
 	records := make([]*kgo.Record, 0, len(msgs))
 	ids := make(map[*kgo.Record]uuid.UUID, len(msgs))
 
@@ -42,7 +42,7 @@ func (p *Publisher) Publish(ctx context.Context, msgs []outbox.Message) []outbox
 		ids[rec] = m.ID
 	}
 
-	produced := p.cl.ProduceSync(ctx, records...)
+	produced := p.client.ProduceSync(ctx, records...)
 	results := make([]outbox.Result, 0, len(produced))
 
 	for _, res := range produced {

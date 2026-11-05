@@ -13,20 +13,20 @@ import (
 )
 
 type Options struct {
-	Repos             Repositories
-	UoW               UnitOfWork
-	Hasher            PasswordHasher
-	AccessTokenIssuer AccessTokenIssuer
-	RefreshGenerator  RefreshTokenGenerator
-	AccessTokenTTL    time.Duration
-	SessionTTL        time.Duration
-	Log               *slog.Logger
+	Repos                 Repositories
+	UoW                   UnitOfWork
+	PasswordHasher        PasswordHasher
+	AccessTokenIssuer     AccessTokenIssuer
+	RefreshTokenGenerator RefreshTokenGenerator
+	AccessTokenTTL        time.Duration
+	SessionTTL            time.Duration
+	Log                   *slog.Logger
 }
 
 type Service struct {
 	repos                 Repositories
 	uow                   UnitOfWork
-	hasher                PasswordHasher
+	passwordHasher        PasswordHasher
 	accessTokenIssuer     AccessTokenIssuer
 	refreshTokenGenerator RefreshTokenGenerator
 	accessTokenTTL        time.Duration
@@ -38,9 +38,9 @@ func New(opts Options) *Service {
 	return &Service{
 		repos:                 opts.Repos,
 		uow:                   opts.UoW,
-		hasher:                opts.Hasher,
+		passwordHasher:        opts.PasswordHasher,
 		accessTokenIssuer:     opts.AccessTokenIssuer,
-		refreshTokenGenerator: opts.RefreshGenerator,
+		refreshTokenGenerator: opts.RefreshTokenGenerator,
 		accessTokenTTL:        opts.AccessTokenTTL,
 		sessionTTL:            opts.SessionTTL,
 		log:                   opts.Log,
@@ -65,7 +65,7 @@ type RegisterOutput struct {
 func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutput, error) {
 	now := time.Now().UTC()
 
-	passwordHash, err := s.hasher.Hash(ctx, in.Password)
+	passwordHash, err := s.passwordHasher.Hash(ctx, in.Password)
 	if err != nil {
 		return RegisterOutput{}, fmt.Errorf("hash password: %w", err)
 	}
@@ -132,7 +132,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		return LoginOutput{}, fmt.Errorf("find user: %w", err)
 	}
 
-	match, err := s.hasher.Verify(ctx, in.Password, u.PasswordHash)
+	match, err := s.passwordHasher.Verify(ctx, in.Password, u.PasswordHash)
 	if err != nil {
 		return LoginOutput{}, fmt.Errorf("verify password: %w", err)
 	}

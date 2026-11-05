@@ -9,19 +9,19 @@ import (
 	"github.com/dz-market/svc-auth/internal/domain/user"
 )
 
-type UsersRepository interface {
+type UserRepository interface {
 	Create(ctx context.Context, u user.User) error
 	ByEmail(ctx context.Context, email string) (user.User, error)
 }
 
-type RefreshTokensRepository interface {
+type RefreshTokenRepository interface {
 	Create(ctx context.Context, t session.RefreshToken) error
 	ByHash(ctx context.Context, hash []byte) (session.RefreshToken, error)
 	MarkUsed(ctx context.Context, id uuid.UUID, usedAt time.Time) (bool, error)
 	MarkUsedBySessionID(ctx context.Context, sessionID uuid.UUID, usedAt time.Time) error
 }
 
-type SessionsRepository interface {
+type SessionRepository interface {
 	Create(ctx context.Context, s session.Session) error
 	ByID(ctx context.Context, id uuid.UUID) (session.Session, error)
 	Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error
@@ -46,9 +46,9 @@ type RefreshTokenGenerator interface {
 }
 
 type Repositories struct {
-	Users         UsersRepository
-	RefreshTokens RefreshTokensRepository
-	Sessions      SessionsRepository
+	Users         UserRepository
+	RefreshTokens RefreshTokenRepository
+	Sessions      SessionRepository
 	Outbox        OutboxRepository
 }
 
