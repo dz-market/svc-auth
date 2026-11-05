@@ -67,9 +67,9 @@ type testService struct {
 	t *testing.T
 
 	service   *auth.Service
-	users     *mocks.MockUsersRepository
-	tokens    *mocks.MockRefreshTokensRepository
-	sessions  *mocks.MockSessionsRepository
+	users     *mocks.MockUserRepository
+	tokens    *mocks.MockRefreshTokenRepository
+	sessions  *mocks.MockSessionRepository
 	outbox    *mocks.MockOutboxRepository
 	hasher    *mocks.MockPasswordHasher
 	issuer    *mocks.MockAccessTokenIssuer
@@ -82,9 +82,9 @@ func newTestService(t *testing.T) testService {
 
 	s := testService{
 		t:         t,
-		users:     mocks.NewMockUsersRepository(t),
-		tokens:    mocks.NewMockRefreshTokensRepository(t),
-		sessions:  mocks.NewMockSessionsRepository(t),
+		users:     mocks.NewMockUserRepository(t),
+		tokens:    mocks.NewMockRefreshTokenRepository(t),
+		sessions:  mocks.NewMockSessionRepository(t),
 		outbox:    mocks.NewMockOutboxRepository(t),
 		hasher:    mocks.NewMockPasswordHasher(t),
 		issuer:    mocks.NewMockAccessTokenIssuer(t),
