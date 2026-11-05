@@ -13,7 +13,7 @@ Authentication service: identity, tokens and sessions.
 
 ## Run
 
-Required Docker Compose and Task. Clone [infra](https://github.com/dz-market/infra) alongside this repository.
+Requires Docker Compose and Task. Clone [infra](https://github.com/dz-market/infra) alongside this repository.
 
 ```bash
 task --dir ../infra up -- auth
@@ -24,7 +24,7 @@ task --dir ../infra up -- auth
 Requires Go, Task and Goose. With infrastructure running, stop the containerized service and run it locally:
 
 ```bash
-docker compose -f ../infa/local/compose.yml --profile auth stop svc-auth
+docker compose -f ../infra/local/compose.yml --profile auth stop svc-auth
 cp .env.example .env # adjust connection settings
 task migrate:up
 go run ./cmd/service
