@@ -2,9 +2,10 @@
 
 # Auth Service
 
-Authentication service: identity, tokens and sessions.
+Identity, tokens and sessions management.
 
 [![CI](https://github.com/dz-market/svc-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/dz-market/svc-auth/actions/workflows/ci.yml)
+[![Coverate](https://img.shields.io/codecov/c/github/dz-market/svc-auth/main)](https://app.codecov.io/gh/dz-market/svc-auth)
 [![Go version](https://img.shields.io/github/go-mod/go-version/dz-market/svc-auth)](go.mod)
 [![Release](https://img.shields.io/github/v/release/dz-market/svc-auth)](https://github.com/dz-market/svc-auth/releases)
 [![License](https://img.shields.io/github/license/dz-market/svc-auth)](LICENSE)
