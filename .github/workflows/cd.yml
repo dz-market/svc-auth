@@ -14,16 +14,15 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
-    images:
-        name: Images
-        strategy:
-            matrix:
-                include:
-                    - target: runtime
-                      suffix: ""
-                    - target: migrate
-                      suffix: "-migrate"
-        uses: dz-market/.github/.github/workflows/docker-release.yml@main
+    runtime:
+        name: Runtime
+        uses: dz-market/github-actions/.github/workflows/docker-publish.yml@v1
         with:
-            target: ${{ matrix.target }}
-            suffix: ${{ matrix.suffix }}
+            target: runtime
+
+    migrate:
+        name: Migrate
+        uses: dz-market/github-actions/.github/workflows/docker-publish.yml@v1
+        with:
+            target: migrate
+            suffix: -migrate

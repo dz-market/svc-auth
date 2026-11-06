@@ -11,4 +11,4 @@ permissions:
 jobs:
     auto-merge:
         name: Dependabot
-        uses: dz-market/.github/.github/workflows/dependabot-auto-merge.yml@main
+        uses: dz-market/github-actions/.github/workflows/dependabot-auto-merge.yml@v1

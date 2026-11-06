@@ -18,4 +18,16 @@ concurrency:
 jobs:
     go:
         name: Go
-        uses: dz-market/.github/.github/workflows/go-ci.yml@main
+        uses: dz-market/github-actions/.github/workflows/go-ci.yml@v1
+
+    runtime:
+        name: Docker runtime
+        uses: dz-market/github-actions/.github/workflows/docker-build.yml@v1
+        with:
+            target: runtime
+
+    migrate:
+        name: Docker migrate
+        uses: dz-market/github-actions/.github/workflows/docker-build.yml@v1
+        with:
+            target: migrate
