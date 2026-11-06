@@ -1,0 +1,14 @@
+name: Dependabot auto-merge
+
+on:
+    pull_request_target:
+        branches: [main]
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    auto-merge:
+        name: Dependabot
+        uses: dz-market/.github/.github/workflows/dependabot-auto-merge.yml@main
