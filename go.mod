@@ -10,11 +10,11 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/stretchr/testify v1.12.1
-	github.com/twmb/franz-go v1.22.2
-	github.com/twmb/franz-go/pkg/kadm v1.19.0
+	github.com/twmb/franz-go v1.22.3
+	github.com/twmb/franz-go/pkg/kadm v1.20.0
 	github.com/twmb/franz-go/plugin/kslog v1.0.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 )
@@ -78,7 +78,7 @@ require (
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.15.0 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.15.1 // indirect
 	github.com/vektra/mockery/v3 v3.8.1 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
