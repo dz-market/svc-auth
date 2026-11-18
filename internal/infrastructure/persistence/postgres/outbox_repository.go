@@ -15,9 +15,10 @@ import (
 
 	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/domain/user"
-	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	"github.com/dz-market/svc-auth/internal/worker/outbox"
 )
+
+const userRegisteredTopic = "auth.user-registered.v1"
 
 var (
 	_ auth.OutboxRepository = (*OutboxRepository)(nil)
@@ -51,7 +52,7 @@ func (r *OutboxRepository) AddUserRegistered(ctx context.Context, e user.Registe
 		VALUES ($1, $2, $3, $4)
 	`
 
-	if _, err := r.q.Exec(ctx, query, e.EventID, kafka.TopicUserRegistered, e.UserID.String(), payload); err != nil {
+	if _, err := r.q.Exec(ctx, query, e.EventID, userRegisteredTopic, e.UserID.String(), payload); err != nil {
 		return fmt.Errorf("add user registered to outbox: %w", err)
 	}
 

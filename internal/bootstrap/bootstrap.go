@@ -68,9 +68,16 @@ func Run(ctx context.Context, version string) error {
 
 	defer postgresPool.Close()
 
-	kafkaProducerClient, err := newKafkaProducerClient(cfg, log)
+	kafkaProducerClient, err := kafka.NewProducerClient(
+		kafka.ProducerOptions{
+			Brokers:         cfg.Kafka.Brokers,
+			ClientID:        cfg.ServiceName,
+			DeliveryTimeout: cfg.Kafka.DeliveryTimeout,
+			Log:             log,
+		},
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("create kafka producer client: %w", err)
 	}
 
 	defer kafkaProducerClient.Close()
@@ -149,15 +156,6 @@ func Run(ctx context.Context, version string) error {
 
 	g.Go(
 		func() error {
-			kafka.EnsureTopics(
-				ctx, kafkaProducerClient, []kafka.Topic{
-					{
-						Name:       kafka.TopicUserRegistered,
-						Partitions: cfg.Kafka.Topics.UserRegistered.Partitions,
-					},
-				}, log,
-			)
-
 			return relay.Run(ctx)
 		},
 	)
