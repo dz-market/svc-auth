@@ -79,7 +79,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 		return RegisterOutput{}, fmt.Errorf("hash password: %w", err)
 	}
 
-	u := user.New(in.Email, passwordHash, now)
+	u := user.New(user.NewEmail(in.Email), passwordHash, now)
 
 	issued, err := s.issueSession(u.ID, now)
 	if err != nil {
@@ -132,7 +132,7 @@ type LoginOutput struct {
 func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error) {
 	now := time.Now().UTC()
 
-	u, err := s.users.ByEmail(ctx, user.NormalizeEmail(in.Email))
+	u, err := s.users.ByEmail(ctx, user.NewEmail(in.Email))
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return LoginOutput{}, user.ErrInvalidCredentials

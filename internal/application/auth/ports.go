@@ -11,7 +11,7 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, u user.User) error
-	ByEmail(ctx context.Context, email string) (user.User, error)
+	ByEmail(ctx context.Context, email user.Email) (user.User, error)
 }
 
 type RefreshTokenRepository interface {

@@ -329,7 +329,7 @@ func TestService_Login(t *testing.T) {
 			name: "user not found",
 			setup: func(s testService) {
 				s.users.EXPECT().
-					ByEmail(mock.Anything, email).
+					ByEmail(mock.Anything, user.NewEmail(email)).
 					Return(user.User{}, user.ErrNotFound)
 			},
 			wantErr: user.ErrInvalidCredentials,
@@ -338,7 +338,7 @@ func TestService_Login(t *testing.T) {
 			name: "find user error",
 			setup: func(s testService) {
 				s.users.EXPECT().
-					ByEmail(mock.Anything, email).
+					ByEmail(mock.Anything, user.NewEmail(email)).
 					Return(user.User{}, errFailed)
 			},
 			wantErr: errFailed,
@@ -794,7 +794,7 @@ func expectPasswordHash(s testService) {
 
 func expectUserFound(s testService) {
 	s.users.EXPECT().
-		ByEmail(mock.Anything, email).
+		ByEmail(mock.Anything, user.NewEmail(email)).
 		Return(storedUser, nil)
 }
 
@@ -896,7 +896,7 @@ func expectPersistence(s testService) {
 			func(_ context.Context, u user.User) error {
 				userID = u.ID
 
-				assert.Equal(s.t, email, u.Email)
+				assert.Equal(s.t, email, u.Email.String())
 				assert.Equal(s.t, passwordHash, u.PasswordHash)
 				assert.Equal(s.t, fixedNow, u.CreatedAt)
 
