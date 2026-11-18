@@ -19,6 +19,8 @@ jobs:
     go:
         name: Go
         uses: dz-market/github-actions/.github/workflows/go-ci.yml@v1
+        with:
+            coverage-upload: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
 
     runtime:
         name: Docker runtime
