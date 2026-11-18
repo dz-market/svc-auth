@@ -65,25 +65,19 @@ func newTokenProviders(cfg config.Auth) (tokenProviders, error) {
 	}, nil
 }
 
-func (a app) newAuthService(tokens tokenProviders) (*auth.Service, error) {
-	newAuthRepos := func(q ppostgres.Querier) auth.Repositories {
-		return auth.Repositories{
-			Users:         postgres.NewUserRepository(q),
-			RefreshTokens: postgres.NewRefreshTokenRepository(q),
-			Sessions:      postgres.NewSessionRepository(q),
-			Outbox:        postgres.NewOutboxRepository(q),
-		}
-	}
-
-	uow, err := ppostgres.NewUnitOfWork(a.postgres, ppostgres.UnitOfWorkOptions{}, newAuthRepos)
-	if err != nil {
-		return nil, fmt.Errorf("create auth uow: %w", err)
-	}
-
+func (a app) newAuthService(
+	tokens tokenProviders,
+	tx auth.Transactor,
+	q ppostgres.Querier,
+	outboxRepo auth.OutboxRepository,
+) *auth.Service {
 	return auth.New(
 		auth.Options{
-			Repos:                 newAuthRepos(a.postgres),
-			UoW:                   uow,
+			Tx:                    tx,
+			Users:                 postgres.NewUserRepository(q),
+			Sessions:              postgres.NewSessionRepository(q),
+			RefreshTokens:         postgres.NewRefreshTokenRepository(q),
+			Outbox:                outboxRepo,
 			PasswordHasher:        newPasswordHasher(a.cfg.Auth.Password.Argon2ID),
 			AccessTokenIssuer:     tokens.accessTokenIssuer,
 			RefreshTokenGenerator: tokens.refreshTokenGenerator,
@@ -91,7 +85,7 @@ func (a app) newAuthService(tokens tokenProviders) (*auth.Service, error) {
 			SessionTTL:            a.cfg.Auth.Session.TTL,
 			Log:                   a.log,
 		},
-	), nil
+	)
 }
 
 func newPasswordHasher(cfg config.Argon2ID) *argon2id.Hasher {

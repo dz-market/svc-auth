@@ -45,13 +45,6 @@ type RefreshTokenGenerator interface {
 	Fingerprint(value string) []byte
 }
 
-type Repositories struct {
-	Users         UserRepository
-	RefreshTokens RefreshTokenRepository
-	Sessions      SessionRepository
-	Outbox        OutboxRepository
-}
-
-type UnitOfWork interface {
-	Do(ctx context.Context, fn func(r Repositories) error) error
+type Transactor interface {
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }

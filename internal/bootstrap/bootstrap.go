@@ -9,7 +9,8 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"golang.org/x/sync/errgroup"
 
@@ -18,12 +19,12 @@ import (
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
+	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 )
 
 type app struct {
 	cfg                 config.Config
 	log                 *slog.Logger
-	postgres            *pgxpool.Pool
 	kafkaProducerClient *kgo.Client
 }
 
@@ -58,12 +59,12 @@ func Run(ctx context.Context, version string) error {
 		slog.String("log_level", cfg.Log.Level.String()),
 	)
 
-	postgres, err := newPostgres(ctx, cfg.Postgres, cfg.ServiceName)
+	postgresPool, err := newPostgres(ctx, cfg.Postgres, cfg.ServiceName)
 	if err != nil {
 		return err
 	}
 
-	defer postgres.Close()
+	defer postgresPool.Close()
 
 	kafkaProducerClient, err := newKafkaProducerClient(cfg, log)
 	if err != nil {
@@ -85,19 +86,19 @@ func Run(ctx context.Context, version string) error {
 	a := app{
 		cfg:                 cfg,
 		log:                 log,
-		postgres:            postgres,
 		kafkaProducerClient: kafkaProducerClient,
 	}
 
-	authService, err := a.newAuthService(tokens)
+	tx, err := manager.New(trmpgx.NewDefaultFactory(postgresPool))
 	if err != nil {
-		return err
+		return fmt.Errorf("create postgres transaction manager: %w", err)
 	}
 
-	relay, err := a.newRelay()
-	if err != nil {
-		return err
-	}
+	q := postgres.NewTxQuerier(postgresPool, trmpgx.DefaultCtxGetter)
+	outboxRepo := postgres.NewOutboxRepository(q)
+
+	authService := a.newAuthService(tokens, tx, q, outboxRepo)
+	relay := a.newRelay(tx, outboxRepo)
 
 	grpcServer, err := a.newGRPCServer(tokens, authService)
 	if err != nil {
@@ -114,7 +115,7 @@ func Run(ctx context.Context, version string) error {
 		return fmt.Errorf("create grpc health checker: %w", err)
 	}
 
-	if err := checker.Register("postgres", phealth.DependencyOptions{}, postgres.Ping); err != nil {
+	if err := checker.Register("postgres", phealth.DependencyOptions{}, postgresPool.Ping); err != nil {
 		return fmt.Errorf("register postgres health check: %w", err)
 	}
 
