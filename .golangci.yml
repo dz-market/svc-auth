@@ -37,22 +37,22 @@ linters:
         forbidigo:
             analyze-types: true
             forbid:
-                - pattern: ^print(ln)?$
-                  msg: Do not commit print statements.
+                -   pattern: ^print(ln)?$
+                    msg: Do not commit print statements.
 
-                - pattern: ^fmt\.Print.*$
-                  msg: Do not commit print statements.
+                -   pattern: ^fmt\.Print.*$
+                    msg: Do not commit print statements.
 
-                - pattern: ^log.Fatal.*$
-                  msg: Do not terminate process from business code
+                -   pattern: ^log.Fatal.*$
+                    msg: Do not terminate process from business code
 
                 # Ban os.Exit; main.go is excluded in linters/exclusions/rules.
-                - pattern: ^os.Exit.*$
-                  msg: Do not terminate process from business code (Allowed only in main.go)
+                -   pattern: ^os.Exit.*$
+                    msg: Do not terminate process from business code (Allowed only in main.go)
 
                 # Ban panic in main.go; non-main files are excluded in linters/exclusions/rules.
-                - pattern: ^panic$
-                  msg: panic() in main is forbidden. Use os.Exit(1) instead
+                -   pattern: ^panic$
+                    msg: panic() in main is forbidden. Use os.Exit(1) instead
 
         gocritic:
             enable-all: true
@@ -60,6 +60,7 @@ linters:
                 - hugeParam
                 - rangeValCopy
                 - importShadow
+                - unnamedResult
 
         gosec:
             excludes:
@@ -108,94 +109,94 @@ linters:
         revive:
             enable-all-rules: true
             rules:
-                - name: unexported-return
-                  disabled: true
+                -   name: unexported-return
+                    disabled: true
 
-                - name: line-length-limit
-                  disabled: true
+                -   name: line-length-limit
+                    disabled: true
 
                 # Can't be disabled for numbers exclusively (to work only with strings).
                 # For numbers, it triggers for any number like time.Date(2022,...) etc. A lot of false positives
-                - name: add-constant
-                  disabled: true
+                -   name: add-constant
+                    disabled: true
 
-                - name: unhandled-error
-                  disabled: true
+                -   name: unhandled-error
+                    disabled: true
 
                 # Enforces casing (orderId -> orderID, readJson -> readJSON, httpMethod -> HTTPMethod).
                 # Does not always improve readability and too noisy
-                - name: var-naming
-                  disabled: true
+                -   name: var-naming
+                    disabled: true
 
-                - name: nested-structs
-                  disabled: true
+                -   name: nested-structs
+                    disabled: true
 
-                - name: max-public-structs
-                  disabled: true
+                -   name: max-public-structs
+                    disabled: true
 
-                - name: function-length
-                  disabled: true
+                -   name: function-length
+                    disabled: true
 
-                - name: import-shadowing
-                  disabled: true
+                -   name: import-shadowing
+                    disabled: true
 
                 # Enforces the use of specified case for import alias names
-                - name: import-alias-naming
-                  arguments:
-                      # - allow-regex: "^([a-z][a-z0-9]*(_[a-z0-9]+)*)|([A-Z][A-Z0-9]*)$" # allowed: flatcase, SCREAMINGCASE and snake_case
-                      - allow-regex: "^[a-z][a-z0-9_]*$" # allowed: flatcase and snake_case
-                      # - allow-regex: "^[a-z]+$" # allowed: only flatcase
-                      # - allow-regex: "^[a-z]+(?:[A-Z][a-z0-9]+)*$" # allowed: flatcase and camelCase
+                -   name: import-alias-naming
+                    arguments:
+                        # - allow-regex: "^([a-z][a-z0-9]*(_[a-z0-9]+)*)|([A-Z][A-Z0-9]*)$" # allowed: flatcase, SCREAMINGCASE and snake_case
+                        -   allow-regex: "^[a-z][a-z0-9_]*$" # allowed: flatcase and snake_case
+                        # - allow-regex: "^[a-z]+$" # allowed: only flatcase
+                        # - allow-regex: "^[a-z]+(?:[A-Z][a-z0-9]+)*$" # allowed: flatcase and camelCase
 
                 # Triggers when a code block (if, for, switch, etc.) has no statements inside it (or only a comment).
                 # A comment can be left intentionally for explicitness and is not a problem.
-                - name: empty-block
-                  disabled: true
+                -   name: empty-block
+                    disabled: true
 
                 # Triggers when package has functions like Do() and do() simultaneously.
                 # May not be an issue if the unexported function is only used internally and does not affect the public API.
-                - name: confusing-naming
-                  disabled: true
+                -   name: confusing-naming
+                    disabled: true
 
                 # This warns on undocumented exported functions and methods.
-                - name: exported
-                  disabled: true
+                -   name: exported
+                    disabled: true
 
                 # This rule warns on unused method receivers.
-                - name: unused-receiver
-                  disabled: true
+                -   name: unused-receiver
+                    disabled: true
 
                 # Warns on "redundant" else blocks
                 # Sometimes they can be used for explicitness
-                - name: indent-error-flow
-                  disabled: true
+                -   name: indent-error-flow
+                    disabled: true
 
-                - name: early-return
-                  disabled: true
+                -   name: early-return
+                    disabled: true
 
                 # Limits the number of input arguments
-                - name: argument-limit
-                  disabled: true
+                -   name: argument-limit
+                    disabled: true
 
-                - name: cognitive-complexity
-                  disabled: true
+                -   name: cognitive-complexity
+                    disabled: true
 
-                - name: cyclomatic
-                  disabled: true # Dusplicates cyclop.
+                -   name: cyclomatic
+                    disabled: true # Dusplicates cyclop.
 
-                - name: get-return
-                  disabled: true
+                -   name: get-return
+                    disabled: true
 
                 # conflicts with validate user custom flags. Workaround: "validate,option1,option2"
-                - name: struct-tag
-                  disabled: true
+                -   name: struct-tag
+                    disabled: true
 
-                - name: package-naming
-                  arguments:
-                      - convention-name-check-regex: "^[a-z][a-z0-9_]*$" # allow flatcase, snake_case
+                -   name: package-naming
+                    arguments:
+                        -   convention-name-check-regex: "^[a-z][a-z0-9_]*$" # allow flatcase, snake_case
 
-                - name: blank-imports
-                  disabled: true
+                -   name: blank-imports
+                    disabled: true
 
         testifylint:
             # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
@@ -275,16 +276,16 @@ linters:
 
         rules:
             # Allow os.Exit in main.go.
-            - path: '(^|.*/)main\.go$'
-              text: 'Do not terminate process from business code \(Allowed only in main\.go\)'
-              linters:
-                  - forbidigo
+            -   path: '(^|.*/)main\.go$'
+                text: 'Do not terminate process from business code \(Allowed only in main\.go\)'
+                linters:
+                    - forbidigo
 
             # Exclude non-main files from the panic ban.
-            - path-except: '(^|.*/)main\.go$'
-              linters:
-                  - forbidigo
-              text: 'panic\(\) in main is forbidden\. Use os\.Exit\(1\) instead'
+            -   path-except: '(^|.*/)main\.go$'
+                linters:
+                    - forbidigo
+                text: 'panic\(\) in main is forbidden\. Use os\.Exit\(1\) instead'
 
 formatters:
     enable:
