@@ -8,7 +8,7 @@ require (
 	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.5
 	github.com/dz-market/platform/config v0.7.0
 	github.com/dz-market/platform/config/resolver/vault v0.1.0
-	github.com/dz-market/platform/database/postgres v0.6.0
+	github.com/dz-market/platform/database/postgres v0.7.0
 	github.com/dz-market/platform/grpc v0.7.0
 	github.com/dz-market/platform/logger v0.6.0
 	github.com/dz-market/platform/vault v0.7.0
