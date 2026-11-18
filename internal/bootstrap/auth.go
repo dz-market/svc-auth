@@ -65,7 +65,7 @@ func newTokenProviders(cfg config.Auth) (tokenProviders, error) {
 	}, nil
 }
 
-func (a app) newAuthService(tokens tokenProviders) *auth.Service {
+func (a app) newAuthService(tokens tokenProviders) (*auth.Service, error) {
 	newAuthRepos := func(q ppostgres.Querier) auth.Repositories {
 		return auth.Repositories{
 			Users:         postgres.NewUserRepository(q),
@@ -75,10 +75,15 @@ func (a app) newAuthService(tokens tokenProviders) *auth.Service {
 		}
 	}
 
+	uow, err := ppostgres.NewUnitOfWork(a.postgres, ppostgres.UnitOfWorkOptions{}, newAuthRepos)
+	if err != nil {
+		return nil, fmt.Errorf("create auth uow: %w", err)
+	}
+
 	return auth.New(
 		auth.Options{
 			Repos:                 newAuthRepos(a.postgres),
-			UoW:                   ppostgres.NewUnitOfWork(a.postgres, newAuthRepos),
+			UoW:                   uow,
 			PasswordHasher:        newPasswordHasher(a.cfg.Auth.Password.Argon2ID),
 			AccessTokenIssuer:     tokens.accessTokenIssuer,
 			RefreshTokenGenerator: tokens.refreshTokenGenerator,
@@ -86,7 +91,7 @@ func (a app) newAuthService(tokens tokenProviders) *auth.Service {
 			SessionTTL:            a.cfg.Auth.Session.TTL,
 			Log:                   a.log,
 		},
-	)
+	), nil
 }
 
 func newPasswordHasher(cfg config.Argon2ID) *argon2id.Hasher {

@@ -3,21 +3,23 @@ package slog
 import (
 	"log/slog"
 
-	plogger "github.com/dz-market/platform/logger/slog"
+	"github.com/dz-market/platform/logger"
 )
 
 type Options struct {
-	Level   slog.Level
 	Format  string
+	Level   slog.Level
 	Service string
 	Version string
 }
 
-func New(opts Options) *slog.Logger {
-	return plogger.New(
-		plogger.Options{
-			Level:   opts.Level,
-			Format:  plogger.Format(opts.Format),
+func New(opts Options) (*slog.Logger, error) {
+	return logger.New(
+		logger.Options{
+			Format: logger.Format(opts.Format),
+			HandlerOptions: slog.HandlerOptions{
+				Level: opts.Level,
+			},
 			Service: opts.Service,
 			Version: opts.Version,
 		},

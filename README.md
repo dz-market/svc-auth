@@ -30,5 +30,3 @@ cp .env.example .env # adjust connection settings
 task migrate:up
 go run ./cmd/service
 ```
-
-Signing keys are loaded from Vault using the AppRole credentials configured in `.env`.

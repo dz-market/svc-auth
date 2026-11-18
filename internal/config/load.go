@@ -5,10 +5,14 @@ import (
 	"fmt"
 
 	pconfig "github.com/dz-market/platform/config"
+	vaultresolver "github.com/dz-market/platform/config/resolver/vault"
 	"github.com/dz-market/platform/vault"
 )
 
-const envPath = ".env"
+const (
+	envPath      = ".env"
+	vaultAddrEnv = "VAULT_ADDR"
+)
 
 func Load(ctx context.Context) (Config, error) {
 	env, err := pconfig.LoadEnv(envPath)
@@ -16,20 +20,20 @@ func Load(ctx context.Context) (Config, error) {
 		return Config{}, fmt.Errorf("load env: %w", err)
 	}
 
-	vaultCfg, err := vault.ConfigFromEnv(env)
+	vaultAddr, err := env.Required(vaultAddrEnv)
 	if err != nil {
-		return Config{}, fmt.Errorf("vault config: %w", err)
+		return Config{}, err
 	}
 
-	vaultClient, err := vault.New(ctx, vaultCfg)
+	vaultClient, err := vault.NewWithAddr(vaultAddr)
 	if err != nil {
-		return Config{}, fmt.Errorf("vault: %w", err)
+		return Config{}, fmt.Errorf("create vault client: %w", err)
 	}
 
 	cfg, err := pconfig.Load[Config](
 		ctx,
 		pconfig.WithEnvPath(envPath),
-		pconfig.WithResolver("vault", vault.NewResolver(vaultClient)),
+		pconfig.WithResolver("vault", vaultresolver.New(vaultClient)),
 	)
 	if err != nil {
 		return cfg, err

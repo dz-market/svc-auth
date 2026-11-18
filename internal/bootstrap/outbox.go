@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"fmt"
+
 	ppostgres "github.com/dz-market/platform/database/postgres"
 
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka/producer"
@@ -8,14 +10,19 @@ import (
 	"github.com/dz-market/svc-auth/internal/worker/outbox"
 )
 
-func (a app) newRelay() *outbox.Relay {
+func (a app) newRelay() (*outbox.Relay, error) {
+	uow, err := ppostgres.NewUnitOfWork(
+		a.postgres, ppostgres.UnitOfWorkOptions{}, func(q ppostgres.Querier) outbox.Store {
+			return postgres.NewOutboxRepository(q)
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create outbox uow: %w", err)
+	}
+
 	return outbox.New(
 		outbox.Options{
-			UoW: ppostgres.NewUnitOfWork(
-				a.postgres, func(q ppostgres.Querier) outbox.Store {
-					return postgres.NewOutboxRepository(q)
-				},
-			),
+			UoW:          uow,
 			Publisher:    producer.New(a.kafkaProducerClient),
 			PollInterval: a.cfg.Outbox.PollInterval,
 			BatchSize:    a.cfg.Outbox.BatchSize,
@@ -23,5 +30,5 @@ func (a app) newRelay() *outbox.Relay {
 			MaxAttempts:  a.cfg.Outbox.MaxAttempts,
 			Log:          a.log,
 		},
-	)
+	), nil
 }
