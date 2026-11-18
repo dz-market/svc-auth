@@ -15,10 +15,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	phealth "github.com/dz-market/platform/grpc/health"
+	"github.com/dz-market/platform/logger"
 
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
-	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
 	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 )
 
@@ -39,8 +39,10 @@ func Run(ctx context.Context, version string) error {
 
 	log, err := logger.New(
 		logger.Options{
-			Format:  cfg.Log.Format,
-			Level:   cfg.Log.Level,
+			Format: logger.Format(cfg.Log.Format),
+			HandlerOptions: slog.HandlerOptions{
+				Level: cfg.Log.Level,
+			},
 			Service: cfg.ServiceName,
 			Version: version,
 		},
