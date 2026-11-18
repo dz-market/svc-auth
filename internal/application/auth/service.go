@@ -13,8 +13,11 @@ import (
 )
 
 type Options struct {
-	Repos                 Repositories
-	UoW                   UnitOfWork
+	Tx                    Transactor
+	Users                 UserRepository
+	Sessions              SessionRepository
+	RefreshTokens         RefreshTokenRepository
+	Outbox                OutboxRepository
 	PasswordHasher        PasswordHasher
 	AccessTokenIssuer     AccessTokenIssuer
 	RefreshTokenGenerator RefreshTokenGenerator
@@ -24,8 +27,11 @@ type Options struct {
 }
 
 type Service struct {
-	repos                 Repositories
-	uow                   UnitOfWork
+	tx                    Transactor
+	users                 UserRepository
+	sessions              SessionRepository
+	refreshTokens         RefreshTokenRepository
+	outbox                OutboxRepository
 	passwordHasher        PasswordHasher
 	accessTokenIssuer     AccessTokenIssuer
 	refreshTokenGenerator RefreshTokenGenerator
@@ -36,8 +42,11 @@ type Service struct {
 
 func New(opts Options) *Service {
 	return &Service{
-		repos:                 opts.Repos,
-		uow:                   opts.UoW,
+		tx:                    opts.Tx,
+		users:                 opts.Users,
+		sessions:              opts.Sessions,
+		refreshTokens:         opts.RefreshTokens,
+		outbox:                opts.Outbox,
 		passwordHasher:        opts.PasswordHasher,
 		accessTokenIssuer:     opts.AccessTokenIssuer,
 		refreshTokenGenerator: opts.RefreshTokenGenerator,
@@ -77,21 +86,21 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterOutpu
 		return RegisterOutput{}, err
 	}
 
-	err = s.uow.Do(
-		ctx, func(r Repositories) error {
-			if err := r.Users.Create(ctx, u); err != nil {
+	err = s.tx.Do(
+		ctx, func(ctx context.Context) error {
+			if err := s.users.Create(ctx, u); err != nil {
 				return err
 			}
 
-			if err := r.Sessions.Create(ctx, issued.session); err != nil {
+			if err := s.sessions.Create(ctx, issued.session); err != nil {
 				return err
 			}
 
-			if err := r.RefreshTokens.Create(ctx, issued.refreshToken); err != nil {
+			if err := s.refreshTokens.Create(ctx, issued.refreshToken); err != nil {
 				return err
 			}
 
-			return r.Outbox.AddUserRegistered(ctx, user.NewRegistered(u))
+			return s.outbox.AddUserRegistered(ctx, user.NewRegistered(u))
 		},
 	)
 	if err != nil {
@@ -123,7 +132,7 @@ type LoginOutput struct {
 func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error) {
 	now := time.Now().UTC()
 
-	u, err := s.repos.Users.ByEmail(ctx, user.NormalizeEmail(in.Email))
+	u, err := s.users.ByEmail(ctx, user.NormalizeEmail(in.Email))
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return LoginOutput{}, user.ErrInvalidCredentials
@@ -146,13 +155,13 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		return LoginOutput{}, err
 	}
 
-	err = s.uow.Do(
-		ctx, func(r Repositories) error {
-			if err := r.Sessions.Create(ctx, issued.session); err != nil {
+	err = s.tx.Do(
+		ctx, func(ctx context.Context) error {
+			if err := s.sessions.Create(ctx, issued.session); err != nil {
 				return err
 			}
 
-			return r.RefreshTokens.Create(ctx, issued.refreshToken)
+			return s.refreshTokens.Create(ctx, issued.refreshToken)
 		},
 	)
 	if err != nil {
@@ -183,7 +192,7 @@ type RefreshOutput struct {
 func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, error) {
 	now := time.Now().UTC()
 
-	rt, err := s.repos.RefreshTokens.ByHash(ctx, s.refreshTokenGenerator.Fingerprint(in.RefreshToken))
+	rt, err := s.refreshTokens.ByHash(ctx, s.refreshTokenGenerator.Fingerprint(in.RefreshToken))
 	if err != nil {
 		if errors.Is(err, session.ErrRefreshTokenNotFound) {
 			return RefreshOutput{}, session.ErrInvalidRefreshToken
@@ -192,7 +201,7 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 		return RefreshOutput{}, fmt.Errorf("find refresh token: %w", err)
 	}
 
-	sess, err := s.repos.Sessions.ByID(ctx, rt.SessionID)
+	sess, err := s.sessions.ByID(ctx, rt.SessionID)
 	if err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			return RefreshOutput{}, session.ErrInvalidRefreshToken
@@ -210,9 +219,9 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 		return RefreshOutput{}, err
 	}
 
-	err = s.uow.Do(
-		ctx, func(r Repositories) error {
-			marked, err := r.RefreshTokens.MarkUsed(ctx, rt.ID, now)
+	err = s.tx.Do(
+		ctx, func(ctx context.Context) error {
+			marked, err := s.refreshTokens.MarkUsed(ctx, rt.ID, now)
 			if err != nil {
 				return err
 			}
@@ -221,7 +230,7 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 				return session.ErrInvalidRefreshToken
 			}
 
-			return r.RefreshTokens.Create(ctx, issued.refreshToken)
+			return s.refreshTokens.Create(ctx, issued.refreshToken)
 		},
 	)
 	if err != nil {
@@ -241,13 +250,13 @@ type LogoutInput struct {
 func (s *Service) Logout(ctx context.Context, in LogoutInput) error {
 	now := time.Now().UTC()
 
-	err := s.uow.Do(
-		ctx, func(r Repositories) error {
-			if err := r.Sessions.Revoke(ctx, in.SessionID, now); err != nil {
+	err := s.tx.Do(
+		ctx, func(ctx context.Context) error {
+			if err := s.sessions.Revoke(ctx, in.SessionID, now); err != nil {
 				return err
 			}
 
-			return r.RefreshTokens.MarkUsedBySessionID(ctx, in.SessionID, now)
+			return s.refreshTokens.MarkUsedBySessionID(ctx, in.SessionID, now)
 		},
 	)
 	if err != nil {

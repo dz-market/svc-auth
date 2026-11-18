@@ -66,43 +66,39 @@ var errFailed = errors.New("failed")
 type testService struct {
 	t *testing.T
 
-	service   *auth.Service
-	users     *mocks.MockUserRepository
-	tokens    *mocks.MockRefreshTokenRepository
-	sessions  *mocks.MockSessionRepository
-	outbox    *mocks.MockOutboxRepository
-	hasher    *mocks.MockPasswordHasher
-	issuer    *mocks.MockAccessTokenIssuer
-	generator *mocks.MockRefreshTokenGenerator
-	uow       *mocks.MockUnitOfWork
+	service       *auth.Service
+	users         *mocks.MockUserRepository
+	refreshTokens *mocks.MockRefreshTokenRepository
+	sessions      *mocks.MockSessionRepository
+	outbox        *mocks.MockOutboxRepository
+	hasher        *mocks.MockPasswordHasher
+	issuer        *mocks.MockAccessTokenIssuer
+	generator     *mocks.MockRefreshTokenGenerator
+	tx            *mocks.MockTransactor
 }
 
 func newTestService(t *testing.T) testService {
 	t.Helper()
 
 	s := testService{
-		t:         t,
-		users:     mocks.NewMockUserRepository(t),
-		tokens:    mocks.NewMockRefreshTokenRepository(t),
-		sessions:  mocks.NewMockSessionRepository(t),
-		outbox:    mocks.NewMockOutboxRepository(t),
-		hasher:    mocks.NewMockPasswordHasher(t),
-		issuer:    mocks.NewMockAccessTokenIssuer(t),
-		generator: mocks.NewMockRefreshTokenGenerator(t),
-		uow:       mocks.NewMockUnitOfWork(t),
-	}
-
-	repos := auth.Repositories{
-		Users:         s.users,
-		RefreshTokens: s.tokens,
-		Sessions:      s.sessions,
-		Outbox:        s.outbox,
+		t:             t,
+		users:         mocks.NewMockUserRepository(t),
+		refreshTokens: mocks.NewMockRefreshTokenRepository(t),
+		sessions:      mocks.NewMockSessionRepository(t),
+		outbox:        mocks.NewMockOutboxRepository(t),
+		hasher:        mocks.NewMockPasswordHasher(t),
+		issuer:        mocks.NewMockAccessTokenIssuer(t),
+		generator:     mocks.NewMockRefreshTokenGenerator(t),
+		tx:            mocks.NewMockTransactor(t),
 	}
 
 	s.service = auth.New(
 		auth.Options{
-			Repos:                 repos,
-			UoW:                   s.uow,
+			Tx:                    s.tx,
+			Users:                 s.users,
+			Sessions:              s.sessions,
+			RefreshTokens:         s.refreshTokens,
+			Outbox:                s.outbox,
 			PasswordHasher:        s.hasher,
 			AccessTokenIssuer:     s.issuer,
 			RefreshTokenGenerator: s.generator,
@@ -181,7 +177,7 @@ func TestService_Register(t *testing.T) {
 				expectPasswordHash(s)
 				expectTokensIssued(s)
 
-				s.uow.EXPECT().
+				s.tx.EXPECT().
 					Do(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -232,7 +228,7 @@ func TestService_Register(t *testing.T) {
 					Create(mock.Anything, mock.Anything).
 					Return(nil)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					Create(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -253,7 +249,7 @@ func TestService_Register(t *testing.T) {
 					Create(mock.Anything, mock.Anything).
 					Return(nil)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					Create(mock.Anything, mock.Anything).
 					Return(nil)
 
@@ -402,7 +398,7 @@ func TestService_Login(t *testing.T) {
 				expectAccessIssue(s)
 				expectRefreshGenerate(s)
 
-				s.uow.EXPECT().
+				s.tx.EXPECT().
 					Do(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -436,7 +432,7 @@ func TestService_Login(t *testing.T) {
 					Create(mock.Anything, mock.Anything).
 					Return(nil)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					Create(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -514,7 +510,7 @@ func TestService_Refresh(t *testing.T) {
 			setup: func(s testService) {
 				expectFingerprint(s)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					ByHash(mock.Anything, oldRefreshFingerprint).
 					Return(session.RefreshToken{}, session.ErrRefreshTokenNotFound)
 			},
@@ -525,7 +521,7 @@ func TestService_Refresh(t *testing.T) {
 			setup: func(s testService) {
 				expectFingerprint(s)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					ByHash(mock.Anything, oldRefreshFingerprint).
 					Return(session.RefreshToken{}, errFailed)
 			},
@@ -622,7 +618,7 @@ func TestService_Refresh(t *testing.T) {
 				expectSessionFound(s)
 				expectTokensIssued(s)
 
-				s.uow.EXPECT().
+				s.tx.EXPECT().
 					Do(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -637,7 +633,7 @@ func TestService_Refresh(t *testing.T) {
 				expectTokensIssued(s)
 				expectTransaction(s)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
 					Return(false, errFailed)
 			},
@@ -652,7 +648,7 @@ func TestService_Refresh(t *testing.T) {
 				expectTokensIssued(s)
 				expectTransaction(s)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
 					Return(false, nil)
 			},
@@ -668,7 +664,7 @@ func TestService_Refresh(t *testing.T) {
 				expectTransaction(s)
 				expectTokenMarkedUsed(s)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					Create(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -728,7 +724,7 @@ func TestService_Logout(t *testing.T) {
 		{
 			name: "transaction error",
 			setup: func(s testService) {
-				s.uow.EXPECT().
+				s.tx.EXPECT().
 					Do(mock.Anything, mock.Anything).
 					Return(errFailed)
 			},
@@ -751,7 +747,7 @@ func TestService_Logout(t *testing.T) {
 				expectTransaction(s)
 				expectSessionRevoked(s)
 
-				s.tokens.EXPECT().
+				s.refreshTokens.EXPECT().
 					MarkUsedBySessionID(mock.Anything, storedSession.ID, fixedNow).
 					Return(errFailed)
 			},
@@ -815,7 +811,7 @@ func expectFingerprint(s testService) {
 }
 
 func expectRefreshTokenFound(s testService) {
-	s.tokens.EXPECT().
+	s.refreshTokens.EXPECT().
 		ByHash(mock.Anything, oldRefreshFingerprint).
 		Return(storedRefreshToken, nil)
 }
@@ -827,7 +823,7 @@ func expectSessionFound(s testService) {
 }
 
 func expectTokenMarkedUsed(s testService) {
-	s.tokens.EXPECT().
+	s.refreshTokens.EXPECT().
 		MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
 		Return(true, nil)
 }
@@ -839,7 +835,7 @@ func expectSessionRevoked(s testService) {
 }
 
 func expectSessionTokensMarkedUsed(s testService) {
-	s.tokens.EXPECT().
+	s.refreshTokens.EXPECT().
 		MarkUsedBySessionID(mock.Anything, storedSession.ID, fixedNow).
 		Return(nil)
 }
@@ -875,18 +871,13 @@ func expectTokensIssued(s testService) {
 }
 
 func expectTransaction(s testService) {
-	s.uow.EXPECT().
+	s.t.Helper()
+
+	s.tx.EXPECT().
 		Do(mock.Anything, mock.Anything).
 		RunAndReturn(
-			func(_ context.Context, fn func(auth.Repositories) error) error {
-				return fn(
-					auth.Repositories{
-						Users:         s.users,
-						RefreshTokens: s.tokens,
-						Sessions:      s.sessions,
-						Outbox:        s.outbox,
-					},
-				)
+			func(ctx context.Context, fn func(context.Context) error) error {
+				return fn(ctx)
 			},
 		)
 }
@@ -927,7 +918,7 @@ func expectPersistence(s testService) {
 			},
 		)
 
-	s.tokens.EXPECT().
+	s.refreshTokens.EXPECT().
 		Create(mock.Anything, mock.Anything).
 		RunAndReturn(
 			func(_ context.Context, rt session.RefreshToken) error {
@@ -970,7 +961,7 @@ func expectLoginPersistence(s testService) {
 			},
 		)
 
-	s.tokens.EXPECT().
+	s.refreshTokens.EXPECT().
 		Create(mock.Anything, mock.Anything).
 		RunAndReturn(
 			func(_ context.Context, rt session.RefreshToken) error {
@@ -986,7 +977,7 @@ func expectLoginPersistence(s testService) {
 func expectRefreshPersistence(s testService) {
 	s.t.Helper()
 
-	s.tokens.EXPECT().
+	s.refreshTokens.EXPECT().
 		Create(mock.Anything, mock.Anything).
 		RunAndReturn(
 			func(_ context.Context, rt session.RefreshToken) error {

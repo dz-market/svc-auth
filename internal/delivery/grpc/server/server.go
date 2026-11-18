@@ -8,14 +8,14 @@ import (
 
 	"buf.build/go/protovalidate"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
+	validation "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/selector"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 
+	pgrpc "github.com/dz-market/platform/grpc"
 	pinterceptor "github.com/dz-market/platform/grpc/interceptor"
-	pserver "github.com/dz-market/platform/grpc/server"
 	authv1 "github.com/dz-market/protobuf/gen/go/auth/api/v1"
 
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/server/interceptor"
@@ -34,11 +34,8 @@ type Options struct {
 
 type Server struct {
 	grpc            *grpc.Server
-	health          *health.Server
-	reportHealth    func(healthy bool)
 	addr            string
 	shutdownTimeout time.Duration
-	log             *slog.Logger
 }
 
 func New(opts Options, log *slog.Logger) *Server {
@@ -56,7 +53,13 @@ func New(opts Options, log *slog.Logger) *Server {
 	)
 
 	srv := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(pinterceptor.Default(log, opts.Validator, auth)...),
+		grpc.ChainUnaryInterceptor(
+			pinterceptor.RequestID(),
+			pinterceptor.Logging(log),
+			pinterceptor.Recovery(log),
+			auth,
+			validation.UnaryServerInterceptor(opts.Validator),
+		),
 		grpc.KeepaliveParams(
 			keepalive.ServerParameters{
 				MaxConnectionAge:      opts.MaxConnectionAge,
@@ -66,8 +69,6 @@ func New(opts Options, log *slog.Logger) *Server {
 		grpc.MaxRecvMsgSize(opts.MaxRecvMsgSize),
 	)
 
-	healthSrv := pserver.RegisterHealth(srv)
-
 	if opts.Reflection {
 		reflection.Register(srv)
 
@@ -76,25 +77,18 @@ func New(opts Options, log *slog.Logger) *Server {
 
 	return &Server{
 		grpc:            srv,
-		health:          healthSrv,
-		reportHealth:    pserver.ReportHealth(healthSrv),
 		addr:            opts.Addr,
 		shutdownTimeout: opts.ShutdownTimeout,
-		log:             log,
 	}
 }
 
-func (s *Server) Run(ctx context.Context) error {
-	return pserver.ListenAndServe(
-		ctx, s.grpc, s.addr, pserver.ServeOptions{
+func (s *Server) Run(ctx context.Context, beforeStop func()) error {
+	return pgrpc.ListenAndServe(
+		ctx, s.grpc, s.addr, pgrpc.ServeOptions{
 			ShutdownTimeout: s.shutdownTimeout,
-			BeforeStop:      s.health.Shutdown,
-		}, s.log,
+			BeforeStop:      beforeStop,
+		},
 	)
-}
-
-func (s *Server) SetHealthy(healthy bool) {
-	s.reportHealth(healthy)
 }
 
 func (s *Server) Registrar() grpc.ServiceRegistrar {

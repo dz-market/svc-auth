@@ -2,26 +2,29 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"golang.org/x/sync/errgroup"
 
-	ppostgres "github.com/dz-market/platform/database/postgres"
+	phealth "github.com/dz-market/platform/grpc/health"
 
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	logger "github.com/dz-market/svc-auth/internal/infrastructure/observability/logger/slog"
+	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 )
 
 type app struct {
 	cfg                 config.Config
 	log                 *slog.Logger
-	postgres            *ppostgres.DB
 	kafkaProducerClient *kgo.Client
 }
 
@@ -34,14 +37,17 @@ func Run(ctx context.Context, version string) error {
 		return err
 	}
 
-	log := logger.New(
+	log, err := logger.New(
 		logger.Options{
-			Level:   cfg.Log.Level,
 			Format:  cfg.Log.Format,
+			Level:   cfg.Log.Level,
 			Service: cfg.ServiceName,
 			Version: version,
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("create logger: %w", err)
+	}
 
 	log.DebugContext(ctx, "configuration loaded")
 
@@ -53,12 +59,12 @@ func Run(ctx context.Context, version string) error {
 		slog.String("log_level", cfg.Log.Level.String()),
 	)
 
-	postgres, err := newPostgres(ctx, cfg, log)
+	postgresPool, err := newPostgres(ctx, cfg.Postgres, cfg.ServiceName)
 	if err != nil {
 		return err
 	}
 
-	defer postgres.Close()
+	defer postgresPool.Close()
 
 	kafkaProducerClient, err := newKafkaProducerClient(cfg, log)
 	if err != nil {
@@ -80,39 +86,62 @@ func Run(ctx context.Context, version string) error {
 	a := app{
 		cfg:                 cfg,
 		log:                 log,
-		postgres:            postgres,
 		kafkaProducerClient: kafkaProducerClient,
 	}
 
-	authService := a.newAuthService(tokens)
-	relay := a.newRelay()
-	checker := a.newChecker()
+	tx, err := manager.New(trmpgx.NewDefaultFactory(postgresPool))
+	if err != nil {
+		return fmt.Errorf("create postgres transaction manager: %w", err)
+	}
+
+	q := postgres.NewTxQuerier(postgresPool, trmpgx.DefaultCtxGetter)
+	outboxRepo := postgres.NewOutboxRepository(q)
+
+	authService := a.newAuthService(tokens, tx, q, outboxRepo)
+	relay := a.newRelay(tx, outboxRepo)
 
 	grpcServer, err := a.newGRPCServer(tokens, authService)
 	if err != nil {
 		return err
 	}
 
+	checker, err := phealth.New(
+		grpcServer.Registrar(), phealth.Options{
+			Period:  cfg.Health.Period,
+			Timeout: cfg.Health.Timeout,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("create grpc health checker: %w", err)
+	}
+
+	if err := checker.Register("postgres", phealth.DependencyOptions{}, postgresPool.Ping); err != nil {
+		return fmt.Errorf("register postgres health check: %w", err)
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(
 		func() error {
-			return checker.Run(
-				ctx, func(healthy bool) {
-					log.WarnContext(
-						ctx, "healthy state changed",
-						slog.Bool("healthy", healthy),
-					)
-
-					grpcServer.SetHealthy(healthy)
-				},
-			)
+			return checker.Run(ctx)
 		},
 	)
 
 	g.Go(
 		func() error {
-			return grpcServer.Run(ctx)
+			return grpcServer.Run(
+				ctx, func() {
+					shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.Health.Timeout)
+					defer cancel()
+
+					if err := checker.Shutdown(shutdownCtx); err != nil {
+						log.WarnContext(
+							shutdownCtx, "grpc health shutdown failed",
+							slog.Any("err", err),
+						)
+					}
+				},
+			)
 		},
 	)
 

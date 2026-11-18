@@ -31,8 +31,8 @@ type Store interface {
 	MarkFailed(ctx context.Context, failures []Failure, at time.Time) error
 }
 
-type UnitOfWork interface {
-	Do(ctx context.Context, fn func(s Store) error) error
+type Transactor interface {
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 type Publisher interface {

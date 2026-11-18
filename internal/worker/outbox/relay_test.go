@@ -33,7 +33,7 @@ var (
 
 type testRelay struct {
 	relay     *outbox.Relay
-	uow       *mocks.MockUnitOfWork
+	tx        *mocks.MockTransactor
 	publisher *mocks.MockPublisher
 	store     *mocks.MockStore
 }
@@ -42,23 +42,24 @@ func newTestRelay(t *testing.T) testRelay {
 	t.Helper()
 
 	r := testRelay{
-		uow:       mocks.NewMockUnitOfWork(t),
+		tx:        mocks.NewMockTransactor(t),
 		publisher: mocks.NewMockPublisher(t),
 		store:     mocks.NewMockStore(t),
 	}
 
-	r.uow.EXPECT().
+	r.tx.EXPECT().
 		Do(mock.Anything, mock.Anything).
 		RunAndReturn(
-			func(_ context.Context, fn func(outbox.Store) error) error {
-				return fn(r.store)
+			func(ctx context.Context, fn func(context.Context) error) error {
+				return fn(ctx)
 			},
 		).
 		Maybe()
 
 	r.relay = outbox.New(
 		outbox.Options{
-			UoW:          r.uow,
+			Tx:           r.tx,
+			Store:        r.store,
 			Publisher:    r.publisher,
 			PollInterval: pollInterval,
 			BatchSize:    batchSize,

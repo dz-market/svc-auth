@@ -1,21 +1,15 @@
 package bootstrap
 
 import (
-	ppostgres "github.com/dz-market/platform/database/postgres"
-
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka/producer"
-	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 	"github.com/dz-market/svc-auth/internal/worker/outbox"
 )
 
-func (a app) newRelay() *outbox.Relay {
+func (a app) newRelay(tx outbox.Transactor, store outbox.Store) *outbox.Relay {
 	return outbox.New(
 		outbox.Options{
-			UoW: ppostgres.NewUnitOfWork(
-				a.postgres, func(q ppostgres.Querier) outbox.Store {
-					return postgres.NewOutboxRepository(q)
-				},
-			),
+			Tx:           tx,
+			Store:        store,
 			Publisher:    producer.New(a.kafkaProducerClient),
 			PollInterval: a.cfg.Outbox.PollInterval,
 			BatchSize:    a.cfg.Outbox.BatchSize,
