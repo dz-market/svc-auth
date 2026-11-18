@@ -11,6 +11,8 @@ import (
 
 const headerEventID = "event-id"
 
+var _ outbox.Publisher = (*Producer)(nil)
+
 type Producer struct {
 	client *kgo.Client
 }

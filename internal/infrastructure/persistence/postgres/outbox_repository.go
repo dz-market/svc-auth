@@ -13,9 +13,15 @@ import (
 	ppostgres "github.com/dz-market/platform/database/postgres"
 	autheventsv1 "github.com/dz-market/protobuf/gen/go/auth/events/v1"
 
+	"github.com/dz-market/svc-auth/internal/application/auth"
 	"github.com/dz-market/svc-auth/internal/domain/user"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
 	"github.com/dz-market/svc-auth/internal/worker/outbox"
+)
+
+var (
+	_ auth.OutboxRepository = (*OutboxRepository)(nil)
+	_ outbox.Store          = (*OutboxRepository)(nil)
 )
 
 type OutboxRepository struct {
