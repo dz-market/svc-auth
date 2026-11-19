@@ -9,17 +9,18 @@ import (
 	"github.com/dz-market/svc-auth/internal/bootstrap"
 )
 
+//nolint:gochecknoglobals // set at build time via -ldflags -X
 var buildVersion string
 
 func main() {
-	if err := bootstrap.Run(context.Background(), resolveVersion()); err != nil {
+	if err := bootstrap.Run(context.Background(), version()); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 
 		os.Exit(1)
 	}
 }
 
-func resolveVersion() string {
+func version() string {
 	if buildVersion != "" {
 		return buildVersion
 	}
