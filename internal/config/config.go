@@ -47,15 +47,6 @@ type Postgres struct {
 type Kafka struct {
 	Brokers         []string      `validate:"required,min=1,dive,required" yaml:"brokers"`
 	DeliveryTimeout time.Duration `validate:"required,gt=0"                yaml:"delivery_timeout"`
-	Topics          Topics        `yaml:"topics"`
-}
-
-type Topics struct {
-	UserRegistered Topic `yaml:"user_registered"`
-}
-
-type Topic struct {
-	Partitions int32 `validate:"required,min=1" yaml:"partitions"`
 }
 
 type Outbox struct {

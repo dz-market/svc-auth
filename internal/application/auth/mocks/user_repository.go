@@ -48,7 +48,7 @@ func (_m *MockUserRepository) EXPECT() *MockUserRepository_Expecter {
 }
 
 // ByEmail provides a mock function for the type MockUserRepository
-func (_mock *MockUserRepository) ByEmail(ctx context.Context, email string) (user.User, error) {
+func (_mock *MockUserRepository) ByEmail(ctx context.Context, email user.Email) (user.User, error) {
 	ret := _mock.Called(ctx, email)
 
 	if len(ret) == 0 {
@@ -57,15 +57,15 @@ func (_mock *MockUserRepository) ByEmail(ctx context.Context, email string) (use
 
 	var r0 user.User
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (user.User, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, user.Email) (user.User, error)); ok {
 		return returnFunc(ctx, email)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) user.User); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, user.Email) user.User); ok {
 		r0 = returnFunc(ctx, email)
 	} else {
 		r0 = ret.Get(0).(user.User)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, user.Email) error); ok {
 		r1 = returnFunc(ctx, email)
 	} else {
 		r1 = ret.Error(1)
@@ -80,20 +80,20 @@ type MockUserRepository_ByEmail_Call struct {
 
 // ByEmail is a helper method to define mock.On call
 //   - ctx context.Context
-//   - email string
+//   - email user.Email
 func (_e *MockUserRepository_Expecter) ByEmail(ctx any, email any) *MockUserRepository_ByEmail_Call {
 	return &MockUserRepository_ByEmail_Call{Call: _e.mock.On("ByEmail", ctx, email)}
 }
 
-func (_c *MockUserRepository_ByEmail_Call) Run(run func(ctx context.Context, email string)) *MockUserRepository_ByEmail_Call {
+func (_c *MockUserRepository_ByEmail_Call) Run(run func(ctx context.Context, email user.Email)) *MockUserRepository_ByEmail_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 user.Email
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(user.Email)
 		}
 		run(
 			arg0,
@@ -108,7 +108,7 @@ func (_c *MockUserRepository_ByEmail_Call) Return(user1 user.User, err error) *M
 	return _c
 }
 
-func (_c *MockUserRepository_ByEmail_Call) RunAndReturn(run func(ctx context.Context, email string) (user.User, error)) *MockUserRepository_ByEmail_Call {
+func (_c *MockUserRepository_ByEmail_Call) RunAndReturn(run func(ctx context.Context, email user.Email) (user.User, error)) *MockUserRepository_ByEmail_Call {
 	_c.Call.Return(run)
 	return _c
 }

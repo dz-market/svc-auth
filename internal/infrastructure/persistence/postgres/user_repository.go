@@ -39,7 +39,7 @@ func (r *UserRepository) Create(ctx context.Context, u user.User) error {
 	return nil
 }
 
-func (r *UserRepository) ByEmail(ctx context.Context, email string) (user.User, error) {
+func (r *UserRepository) ByEmail(ctx context.Context, email user.Email) (user.User, error) {
 	const query = `
 		SELECT id, email, password_hash, created_at, updated_at
 		FROM users
@@ -49,7 +49,7 @@ func (r *UserRepository) ByEmail(ctx context.Context, email string) (user.User, 
 	var u user.User
 
 	err := r.q.
-		QueryRow(ctx, query, email).
+		QueryRow(ctx, query, email.String()).
 		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

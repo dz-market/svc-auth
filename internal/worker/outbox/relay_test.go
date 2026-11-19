@@ -35,7 +35,7 @@ type testRelay struct {
 	relay     *outbox.Relay
 	tx        *mocks.MockTransactor
 	publisher *mocks.MockPublisher
-	store     *mocks.MockStore
+	repo      *mocks.MockRepository
 }
 
 func newTestRelay(t *testing.T) testRelay {
@@ -44,7 +44,7 @@ func newTestRelay(t *testing.T) testRelay {
 	r := testRelay{
 		tx:        mocks.NewMockTransactor(t),
 		publisher: mocks.NewMockPublisher(t),
-		store:     mocks.NewMockStore(t),
+		repo:      mocks.NewMockRepository(t),
 	}
 
 	r.tx.EXPECT().
@@ -59,7 +59,7 @@ func newTestRelay(t *testing.T) testRelay {
 	r.relay = outbox.New(
 		outbox.Options{
 			Tx:           r.tx,
-			Store:        r.store,
+			Repo:         r.repo,
 			Publisher:    r.publisher,
 			PollInterval: pollInterval,
 			BatchSize:    batchSize,
@@ -122,7 +122,7 @@ func TestRelay_PublishesDueMessages(t *testing.T) {
 			r := newTestRelay(t)
 			msgs := []outbox.Message{newMessage(0)}
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				Unpublished(mock.Anything, batchSize, fixedNow).
 				Return(msgs, nil).
 				Once()
@@ -132,7 +132,7 @@ func TestRelay_PublishesDueMessages(t *testing.T) {
 				Return(results(msgs)).
 				Once()
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				MarkPublished(mock.Anything, []uuid.UUID{msgs[0].ID}, fixedNow).
 				Return(nil).
 				Once()
@@ -152,7 +152,7 @@ func TestRelay_NothingDue(t *testing.T) {
 		t, func(t *testing.T) {
 			r := newTestRelay(t)
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				Unpublished(mock.Anything, batchSize, fixedNow).
 				Return(nil, nil).
 				Once()
@@ -199,12 +199,12 @@ func TestRelay_Failures(t *testing.T) {
 						r := newTestRelay(t)
 						msgs := []outbox.Message{newMessage(tt.giveAttempts), newMessage(0)}
 
-						r.store.EXPECT().
+						r.repo.EXPECT().
 							Unpublished(mock.Anything, batchSize, fixedNow).
 							Return(msgs, nil).
 							Once()
 
-						r.store.EXPECT().
+						r.repo.EXPECT().
 							Unpublished(mock.Anything, batchSize, fixedNow).
 							Return(nil, nil).
 							Once()
@@ -214,12 +214,12 @@ func TestRelay_Failures(t *testing.T) {
 							Return(results(msgs, errFailed)).
 							Once()
 
-						r.store.EXPECT().
+						r.repo.EXPECT().
 							MarkPublished(mock.Anything, []uuid.UUID{msgs[1].ID}, fixedNow).
 							Return(nil).
 							Once()
 
-						r.store.EXPECT().
+						r.repo.EXPECT().
 							MarkFailed(
 								mock.Anything, []outbox.Failure{
 									{
@@ -253,7 +253,7 @@ func TestRelay_DrainsFullBatches(t *testing.T) {
 			partial := []outbox.Message{newMessage(0)}
 
 			for _, msgs := range [][]outbox.Message{full, partial} {
-				r.store.EXPECT().
+				r.repo.EXPECT().
 					Unpublished(mock.Anything, batchSize, fixedNow).
 					Return(msgs, nil).
 					Once()
@@ -263,7 +263,7 @@ func TestRelay_DrainsFullBatches(t *testing.T) {
 					Return(results(msgs)).
 					Once()
 
-				r.store.EXPECT().
+				r.repo.EXPECT().
 					MarkPublished(mock.Anything, mock.Anything, fixedNow).
 					Return(nil).
 					Once()
@@ -284,12 +284,12 @@ func TestRelay_PollsAfterStoreError(t *testing.T) {
 		t, func(t *testing.T) {
 			r := newTestRelay(t)
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				Unpublished(mock.Anything, batchSize, fixedNow).
 				Return(nil, errFailed).
 				Once()
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				Unpublished(mock.Anything, batchSize, fixedNow.Add(pollInterval)).
 				Return(nil, nil).
 				Once()
@@ -314,7 +314,7 @@ func TestRelay_FinishesBatchOnShutdown(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			msgs := []outbox.Message{newMessage(0), newMessage(0)}
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				Unpublished(mock.Anything, batchSize, fixedNow).
 				Return(msgs, nil).
 				Once()
@@ -330,7 +330,7 @@ func TestRelay_FinishesBatchOnShutdown(t *testing.T) {
 				).
 				Once()
 
-			r.store.EXPECT().
+			r.repo.EXPECT().
 				MarkPublished(mock.Anything, mock.Anything, fixedNow).
 				RunAndReturn(
 					func(ctx context.Context, _ []uuid.UUID, _ time.Time) error {
