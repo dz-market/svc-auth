@@ -19,6 +19,8 @@ jobs:
         uses: dz-market/github-actions/.github/workflows/docker-publish.yml@v1
         with:
             target: runtime
+            build-args: |
+                BUILD_VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
 
     migrate:
         name: Migrate

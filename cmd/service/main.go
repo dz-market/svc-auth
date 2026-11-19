@@ -4,16 +4,32 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/dz-market/svc-auth/internal/bootstrap"
 )
 
-var version = "dev"
+//nolint:gochecknoglobals // set at build time via -ldflags -X
+var buildVersion string
 
 func main() {
-	if err := bootstrap.Run(context.Background(), version); err != nil {
+	if err := bootstrap.Run(context.Background(), version()); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 
 		os.Exit(1)
 	}
+}
+
+func version() string {
+	if buildVersion != "" {
+		return buildVersion
+	}
+
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if version := info.Main.Version; version != "" && version != "(devel)" {
+			return version
+		}
+	}
+
+	return "dev"
 }
