@@ -22,7 +22,7 @@ const userRegisteredTopic = "auth.user-registered.v1"
 
 var (
 	_ auth.OutboxRepository = (*OutboxRepository)(nil)
-	_ outbox.Store          = (*OutboxRepository)(nil)
+	_ outbox.Repository     = (*OutboxRepository)(nil)
 )
 
 type OutboxRepository struct {

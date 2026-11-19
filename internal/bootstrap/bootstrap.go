@@ -9,24 +9,12 @@ import (
 	"runtime"
 	"syscall"
 
-	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
-	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
-	"github.com/twmb/franz-go/pkg/kgo"
-	"golang.org/x/sync/errgroup"
-
-	phealth "github.com/dz-market/platform/grpc/health"
+	ppostgres "github.com/dz-market/platform/database/postgres"
 	"github.com/dz-market/platform/logger"
 
 	"github.com/dz-market/svc-auth/internal/config"
 	"github.com/dz-market/svc-auth/internal/infrastructure/messaging/kafka"
-	"github.com/dz-market/svc-auth/internal/infrastructure/persistence/postgres"
 )
-
-type app struct {
-	cfg                 config.Config
-	log                 *slog.Logger
-	kafkaProducerClient *kgo.Client
-}
 
 func Run(ctx context.Context, version string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -52,7 +40,6 @@ func Run(ctx context.Context, version string) error {
 	}
 
 	log.DebugContext(ctx, "configuration loaded")
-
 	log.InfoContext(
 		ctx, "service starting",
 		slog.String("go_version", runtime.Version()),
@@ -61,11 +48,22 @@ func Run(ctx context.Context, version string) error {
 		slog.String("log_level", cfg.Log.Level.String()),
 	)
 
-	postgresPool, err := newPostgres(ctx, cfg.Postgres, cfg.ServiceName)
+	postgresPool, err := ppostgres.New(
+		ctx, ppostgres.Options{
+			DSN:                cfg.Postgres.DSN,
+			MaxConns:           &cfg.Postgres.MaxConns,
+			MinConns:           &cfg.Postgres.MinConns,
+			MaxConnLifetime:    &cfg.Postgres.MaxConnLifetime,
+			MaxConnIdleTime:    &cfg.Postgres.MaxConnIdleTime,
+			HealthCheckPeriod:  &cfg.Postgres.HealthCheckPeriod,
+			ConnectTimeout:     &cfg.Postgres.ConnectTimeout,
+			ApplicationName:    &cfg.ServiceName,
+			InitialPingTimeout: &cfg.Postgres.PingTimeout,
+		},
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("open postgres pool: %w", err)
 	}
-
 	defer postgresPool.Close()
 
 	kafkaProducerClient, err := kafka.NewProducerClient(
@@ -79,88 +77,14 @@ func Run(ctx context.Context, version string) error {
 	if err != nil {
 		return fmt.Errorf("create kafka producer client: %w", err)
 	}
-
 	defer kafkaProducerClient.Close()
 
-	tokens, err := newTokenProviders(cfg.Auth)
+	application, err := buildApp(ctx, cfg, postgresPool, kafkaProducerClient, log)
 	if err != nil {
 		return err
 	}
 
-	log.InfoContext(
-		ctx, "access key loaded",
-		slog.String("kid", tokens.accessKey.ID),
-	)
-
-	a := app{
-		cfg:                 cfg,
-		log:                 log,
-		kafkaProducerClient: kafkaProducerClient,
-	}
-
-	tx, err := manager.New(trmpgx.NewDefaultFactory(postgresPool))
-	if err != nil {
-		return fmt.Errorf("create postgres transaction manager: %w", err)
-	}
-
-	q := postgres.NewTxQuerier(postgresPool, trmpgx.DefaultCtxGetter)
-	outboxRepo := postgres.NewOutboxRepository(q)
-
-	authService := a.newAuthService(tokens, tx, q, outboxRepo)
-	relay := a.newRelay(tx, outboxRepo)
-
-	grpcServer, err := a.newGRPCServer(tokens, authService)
-	if err != nil {
-		return err
-	}
-
-	checker, err := phealth.New(
-		grpcServer.Registrar(), phealth.Options{
-			Period:  cfg.Health.Period,
-			Timeout: cfg.Health.Timeout,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("create grpc health checker: %w", err)
-	}
-
-	if err := checker.Register("postgres", phealth.DependencyOptions{}, postgresPool.Ping); err != nil {
-		return fmt.Errorf("register postgres health check: %w", err)
-	}
-
-	g, ctx := errgroup.WithContext(ctx)
-
-	g.Go(
-		func() error {
-			return checker.Run(ctx)
-		},
-	)
-
-	g.Go(
-		func() error {
-			return grpcServer.Run(
-				ctx, func() {
-					shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.Health.Timeout)
-					defer cancel()
-
-					if err := checker.Shutdown(shutdownCtx); err != nil {
-						log.WarnContext(
-							shutdownCtx, "grpc health shutdown failed",
-							slog.Any("err", err),
-						)
-					}
-				},
-			)
-		},
-	)
-
-	g.Go(
-		func() error {
-			return relay.Run(ctx)
-		},
-	)
-
-	if err := g.Wait(); err != nil {
+	if err := application.run(ctx); err != nil {
 		return err
 	}
 

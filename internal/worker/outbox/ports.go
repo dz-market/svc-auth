@@ -25,7 +25,7 @@ type Result struct {
 	Err error
 }
 
-type Store interface {
+type Repository interface {
 	Unpublished(ctx context.Context, limit int, now time.Time) ([]Message, error)
 	MarkPublished(ctx context.Context, ids []uuid.UUID, at time.Time) error
 	MarkFailed(ctx context.Context, failures []Failure, at time.Time) error

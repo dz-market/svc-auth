@@ -15,7 +15,7 @@ const (
 
 type Options struct {
 	Tx           Transactor
-	Store        Store
+	Repo         Repository
 	Publisher    Publisher
 	PollInterval time.Duration
 	BatchSize    int
@@ -26,7 +26,7 @@ type Options struct {
 
 type Relay struct {
 	tx           Transactor
-	store        Store
+	repo         Repository
 	publisher    Publisher
 	pollInterval time.Duration
 	batchSize    int
@@ -38,7 +38,7 @@ type Relay struct {
 func New(opts Options) *Relay {
 	return &Relay{
 		tx:           opts.Tx,
-		store:        opts.Store,
+		repo:         opts.Repo,
 		publisher:    opts.Publisher,
 		pollInterval: opts.PollInterval,
 		batchSize:    opts.BatchSize,
@@ -92,7 +92,7 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 		ctx, func(ctx context.Context) error {
 			now := time.Now().UTC()
 
-			msgs, err := r.store.Unpublished(ctx, r.batchSize, now)
+			msgs, err := r.repo.Unpublished(ctx, r.batchSize, now)
 			if err != nil {
 				return fmt.Errorf("load unpublished messages: %w", err)
 			}
@@ -104,13 +104,13 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 			sent, failed := r.publish(ctx, msgs, now)
 
 			if len(sent) > 0 {
-				if err := r.store.MarkPublished(ctx, sent, now); err != nil {
+				if err := r.repo.MarkPublished(ctx, sent, now); err != nil {
 					return fmt.Errorf("mark published messages: %w", err)
 				}
 			}
 
 			if len(failed) > 0 {
-				if err := r.store.MarkFailed(ctx, failed, now); err != nil {
+				if err := r.repo.MarkFailed(ctx, failed, now); err != nil {
 					return fmt.Errorf("mark failed messages: %w", err)
 				}
 			}
