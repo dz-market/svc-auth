@@ -101,7 +101,7 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 				return nil
 			}
 
-			sent, failed := r.publish(ctx, msgs, now)
+			sent, failed := r.publish(ctx, msgs)
 
 			if len(sent) > 0 {
 				if err := r.repo.MarkPublished(ctx, sent, now); err != nil {
@@ -124,7 +124,7 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 	return more, err
 }
 
-func (r *Relay) publish(ctx context.Context, msgs []Message, now time.Time) ([]uuid.UUID, []Failure) {
+func (r *Relay) publish(ctx context.Context, msgs []Message) ([]uuid.UUID, []Failure) {
 	attempts := make(map[uuid.UUID]int, len(msgs))
 	for _, msg := range msgs {
 		attempts[msg.ID] = msg.Attempts + 1
@@ -135,7 +135,10 @@ func (r *Relay) publish(ctx context.Context, msgs []Message, now time.Time) ([]u
 		failed []Failure
 	)
 
-	for _, res := range r.publisher.Publish(ctx, msgs) {
+	results := r.publisher.Publish(ctx, msgs)
+	finishedAt := time.Now().UTC()
+
+	for _, res := range results {
 		if res.Err == nil {
 			sent = append(sent, res.ID)
 
@@ -147,7 +150,7 @@ func (r *Relay) publish(ctx context.Context, msgs []Message, now time.Time) ([]u
 			Err: res.Err.Error(),
 		}
 		if attempts[res.ID] < r.maxAttempts {
-			f.RetryAt = now.Add(retryDelay(attempts[res.ID]))
+			f.RetryAt = finishedAt.Add(retryDelay(attempts[res.ID]))
 		}
 
 		r.log.WarnContext(
