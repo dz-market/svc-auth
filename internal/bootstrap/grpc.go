@@ -33,7 +33,7 @@ func buildGRPC(
 			MaxRecvMsgSize:        cfg.GRPC.MaxRecvMsgSize.Bytes(),
 			MaxConnectionAge:      cfg.GRPC.Keepalive.MaxConnectionAge,
 			MaxConnectionAgeGrace: cfg.GRPC.Keepalive.MaxConnectionAgeGrace,
-			ShutdownTimeout:       cfg.ShutdownTimeout,
+			ShutdownTimeout:       cfg.GRPC.ShutdownTimeout,
 			Validator:             validator,
 			Verifier:              accessToken.verifier,
 		},

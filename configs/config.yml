@@ -1,33 +1,13 @@
 service_name: svc-auth
-shutdown_timeout: 10s
 
 grpc:
     addr: "${env:GRPC_ADDR}"
     reflection: "${env:GRPC_REFLECTION:-false}"
     max_recv_msg_size: 1MB
+    shutdown_timeout: 10s
     keepalive:
         max_connection_age: 30m
         max_connection_age_grace: 10m
-
-postgres:
-    dsn: "${env:POSTGRES_DSN}"
-    max_conns: 10
-    min_conns: 2
-    max_conn_lifetime: 1h
-    max_conn_idle_time: 30m
-    health_check_period: 1m
-    connect_timeout: 5s
-    ping_timeout: 2s
-
-kafka:
-    brokers: ["${env:KAFKA_BROKERS}"]
-    delivery_timeout: 5s
-
-outbox:
-    poll_interval: 1s
-    batch_size: 100
-    batch_timeout: 10s
-    max_attempts: 10
 
 auth:
     access:
@@ -47,6 +27,31 @@ auth:
             salt_length: 16
             key_length: 32
             max_in_flight: 8
+
+postgres:
+    dsn: "${env:POSTGRES_DSN}"
+    max_conns: 10
+    min_conns: 2
+    max_conn_lifetime: 1h
+    max_conn_idle_time: 30m
+    health_check_period: 1m
+    connect_timeout: 5s
+    ping_timeout: 2s
+
+kafka:
+    brokers: ["${env:KAFKA_BROKERS}"]
+    delivery_timeout: 5s
+    log_level: error
+
+outbox:
+    poll_interval: 1s
+    batch_size: 100
+    batch_timeout: 10s
+    max_attempts: 10
+    publisher_recovery:
+        check_timeout: 2s
+        initial_backoff: 5s
+        max_backoff: 1m
 
 health:
     period: 5s

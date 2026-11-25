@@ -83,14 +83,20 @@ func buildApp(
 
 	relay := outbox.New(
 		outbox.Options{
-			Tx:           tx,
-			Repo:         outboxRepo,
-			Publisher:    producer.New(kafkaProducerClient),
+			Tx:                tx,
+			Repo:              outboxRepo,
+			Publisher:         producer.New(kafkaProducerClient),
+			CheckAvailability: kafkaProducerClient.Ping,
+			Log:               log,
+
 			PollInterval: cfg.Outbox.PollInterval,
 			BatchSize:    cfg.Outbox.BatchSize,
 			BatchTimeout: cfg.Outbox.BatchTimeout,
 			MaxAttempts:  cfg.Outbox.MaxAttempts,
-			Log:          log,
+
+			AvailabilityCheckTimeout: cfg.Outbox.PublisherRecovery.CheckTimeout,
+			InitialRecoveryBackoff:   cfg.Outbox.PublisherRecovery.InitialBackoff,
+			MaxRecoveryBackoff:       cfg.Outbox.PublisherRecovery.MaxBackoff,
 		},
 	)
 

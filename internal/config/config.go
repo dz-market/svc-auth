@@ -8,8 +8,7 @@ import (
 )
 
 type Config struct {
-	ServiceName     string        `validate:"required"      yaml:"service_name"`
-	ShutdownTimeout time.Duration `validate:"required,gt=0" yaml:"shutdown_timeout"`
+	ServiceName string `validate:"required" yaml:"service_name"`
 
 	GRPC     GRPC     `yaml:"grpc"`
 	Postgres Postgres `yaml:"postgres"`
@@ -21,9 +20,10 @@ type Config struct {
 }
 
 type GRPC struct {
-	Addr           string           `validate:"required"                          yaml:"addr"`
-	Reflection     bool             `yaml:"reflection"`
-	MaxRecvMsgSize pconfig.ByteSize `validate:"required,minsize=1KB,maxsize=64MB" yaml:"max_recv_msg_size"`
+	Addr            string           `validate:"required"                          yaml:"addr"`
+	Reflection      bool             `yaml:"reflection"`
+	MaxRecvMsgSize  pconfig.ByteSize `validate:"required,minsize=1KB,maxsize=64MB" yaml:"max_recv_msg_size"`
+	ShutdownTimeout time.Duration    `validate:"required,gt=0"                     yaml:"shutdown_timeout"`
 
 	Keepalive Keepalive `yaml:"keepalive"`
 }
@@ -47,13 +47,21 @@ type Postgres struct {
 type Kafka struct {
 	Brokers         []string      `validate:"required,min=1,dive,required" yaml:"brokers"`
 	DeliveryTimeout time.Duration `validate:"required,gt=0"                yaml:"delivery_timeout"`
+	LogLevel        slog.Level    `yaml:"log_level"`
 }
 
 type Outbox struct {
-	PollInterval time.Duration `validate:"required,min=100ms" yaml:"poll_interval"`
-	BatchSize    int           `validate:"required,min=1"     yaml:"batch_size"`
-	BatchTimeout time.Duration `validate:"required,min=1s"    yaml:"batch_timeout"`
-	MaxAttempts  int           `validate:"required,min=1"     yaml:"max_attempts"`
+	PollInterval      time.Duration     `validate:"required,min=100ms" yaml:"poll_interval"`
+	BatchSize         int               `validate:"required,min=1"     yaml:"batch_size"`
+	BatchTimeout      time.Duration     `validate:"required,min=1s"    yaml:"batch_timeout"`
+	MaxAttempts       int               `validate:"required,min=1"     yaml:"max_attempts"`
+	PublisherRecovery PublisherRecovery `yaml:"publisher_recovery"`
+}
+
+type PublisherRecovery struct {
+	CheckTimeout   time.Duration `validate:"required,gt=0"                         yaml:"check_timeout"`
+	InitialBackoff time.Duration `validate:"required,gt=0"                         yaml:"initial_backoff"`
+	MaxBackoff     time.Duration `validate:"required,gt=0,gtefield=InitialBackoff" yaml:"max_backoff"`
 }
 
 type Auth struct {
