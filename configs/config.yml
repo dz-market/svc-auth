@@ -47,6 +47,10 @@ outbox:
     batch_size: 100
     batch_timeout: 10s
     max_attempts: 10
+    publisher_recovery:
+        check_timeout: 2s
+        initial_backoff: 5s
+        max_backoff: 1m
 
 health:
     period: 5s

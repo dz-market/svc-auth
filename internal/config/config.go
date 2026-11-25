@@ -50,10 +50,17 @@ type Kafka struct {
 }
 
 type Outbox struct {
-	PollInterval time.Duration `validate:"required,min=100ms" yaml:"poll_interval"`
-	BatchSize    int           `validate:"required,min=1"     yaml:"batch_size"`
-	BatchTimeout time.Duration `validate:"required,min=1s"    yaml:"batch_timeout"`
-	MaxAttempts  int           `validate:"required,min=1"     yaml:"max_attempts"`
+	PollInterval      time.Duration     `validate:"required,min=100ms" yaml:"poll_interval"`
+	BatchSize         int               `validate:"required,min=1"     yaml:"batch_size"`
+	BatchTimeout      time.Duration     `validate:"required,min=1s"    yaml:"batch_timeout"`
+	MaxAttempts       int               `validate:"required,min=1"     yaml:"max_attempts"`
+	PublisherRecovery PublisherRecovery `yaml:"publisher_recovery"`
+}
+
+type PublisherRecovery struct {
+	CheckTimeout   time.Duration `validate:"required,gt=0"                         yaml:"check_timeout"`
+	InitialBackoff time.Duration `validate:"required,gt=0"                         yaml:"initial_backoff"`
+	MaxBackoff     time.Duration `validate:"required,gt=0,gtefield=InitialBackoff" yaml:"max_backoff"`
 }
 
 type Auth struct {

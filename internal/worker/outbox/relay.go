@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -11,88 +12,196 @@ import (
 const (
 	minRetryDelay = time.Second
 	maxRetryDelay = 5 * time.Minute
+
+	failedBatchesBeforeCheck = 2
+)
+
+type relayMode uint8
+
+const (
+	relayNormal relayMode = iota
+	relayPaused
+	relayProbing
 )
 
 type Options struct {
-	Tx           Transactor
-	Repo         Repository
-	Publisher    Publisher
+	Tx                Transactor
+	Repo              Repository
+	Publisher         Publisher
+	CheckAvailability func(context.Context) error
+	Log               *slog.Logger
+
 	PollInterval time.Duration
 	BatchSize    int
 	BatchTimeout time.Duration
 	MaxAttempts  int
-	Log          *slog.Logger
+
+	AvailabilityCheckTimeout time.Duration
+	InitialRecoveryBackoff   time.Duration
+	MaxRecoveryBackoff       time.Duration
 }
 
 type Relay struct {
-	tx           Transactor
-	repo         Repository
-	publisher    Publisher
+	tx                Transactor
+	repo              Repository
+	publisher         Publisher
+	checkAvailability func(context.Context) error
+	log               *slog.Logger
+
 	pollInterval time.Duration
 	batchSize    int
 	batchTimeout time.Duration
 	maxAttempts  int
-	log          *slog.Logger
+
+	availabilityCheckTimeout time.Duration
+	initialRecoveryBackoff   time.Duration
+	maxRecoveryBackoff       time.Duration
 }
 
 func New(opts Options) *Relay {
 	return &Relay{
-		tx:           opts.Tx,
-		repo:         opts.Repo,
-		publisher:    opts.Publisher,
+		tx:                opts.Tx,
+		repo:              opts.Repo,
+		publisher:         opts.Publisher,
+		checkAvailability: opts.CheckAvailability,
+		log:               opts.Log,
+
 		pollInterval: opts.PollInterval,
 		batchSize:    opts.BatchSize,
 		batchTimeout: opts.BatchTimeout,
 		maxAttempts:  opts.MaxAttempts,
-		log:          opts.Log,
+
+		availabilityCheckTimeout: opts.AvailabilityCheckTimeout,
+		initialRecoveryBackoff:   opts.InitialRecoveryBackoff,
+		maxRecoveryBackoff:       opts.MaxRecoveryBackoff,
 	}
 }
 
 func (r *Relay) Run(ctx context.Context) error {
-	ticker := time.NewTicker(r.pollInterval)
-	defer ticker.Stop()
-
-	for {
-		r.drain(ctx)
-
-		select {
-		case <-ctx.Done():
-			return nil
-
-		case <-ticker.C:
-		}
+	if r.checkAvailability == nil {
+		return errors.New("outbox publisher availability check is required")
 	}
-}
 
-func (r *Relay) drain(ctx context.Context) {
+	state := relayState{
+		mode:    relayNormal,
+		backoff: r.initialRecoveryBackoff,
+	}
+
 	for ctx.Err() == nil {
-		more, err := r.publishBatch(ctx)
-		if err != nil {
-			r.log.ErrorContext(
-				ctx, "outbox relay failed",
-				slog.Any("err", err),
-			)
+		if state.mode == relayPaused {
+			if !waitFor(ctx, state.backoff) {
+				return nil
+			}
 
+			if err := r.checkPublisher(ctx); err != nil {
+				state.backoff = r.nextRecoveryBackoff(state.backoff)
+
+				continue
+			}
+
+			state.mode = relayProbing
+		}
+
+		limit := r.batchSize
+
+		if state.mode == relayProbing {
+			limit = 1
+		}
+
+		result, err := r.publishBatch(ctx, limit)
+		if err != nil {
+			r.log.ErrorContext(ctx, "outbox relay failed", slog.Any("err", err))
+		}
+
+		if ctx.Err() != nil {
+			return nil //nolint:nilerr // The parent context signals the relay to stop.
+		}
+
+		r.handleBatchResult(ctx, &state, result)
+
+		if state.mode == relayPaused {
+			continue
+		}
+
+		if err == nil && result.attempted == limit {
+			continue
+		}
+
+		if !waitFor(ctx, r.pollInterval) {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+type relayState struct {
+	mode          relayMode
+	failedBatches int
+	backoff       time.Duration
+}
+
+func (r *Relay) handleBatchResult(ctx context.Context, state *relayState, result batchResult) {
+	switch {
+	case result.acknowledged > 0:
+		if state.mode == relayProbing {
+			r.log.InfoContext(ctx, "outbox publishing resumed")
+		}
+
+		state.mode = relayNormal
+		state.failedBatches = 0
+		state.backoff = r.initialRecoveryBackoff
+
+	case result.attempted == 0:
+		return
+
+	case state.mode == relayProbing:
+		state.backoff = r.nextRecoveryBackoff(state.backoff)
+		state.mode = relayPaused
+
+	default:
+		state.failedBatches++
+		if state.failedBatches < failedBatchesBeforeCheck {
 			return
 		}
 
-		if !more {
-			return
+		state.failedBatches = 0
+
+		if err := r.checkPublisher(ctx); err != nil {
+			r.log.WarnContext(ctx, "outbox publishing paused", slog.Any("err", err))
+
+			state.mode = relayPaused
 		}
 	}
 }
 
-func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
+func (r *Relay) checkPublisher(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, r.availabilityCheckTimeout)
+	defer cancel()
+
+	return r.checkAvailability(ctx)
+}
+
+func (r *Relay) nextRecoveryBackoff(backoff time.Duration) time.Duration {
+	return backoff + min(backoff, r.maxRecoveryBackoff-backoff)
+}
+
+type batchResult struct {
+	attempted    int
+	acknowledged int
+}
+
+func (r *Relay) publishBatch(ctx context.Context, limit int) (batchResult, error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.batchTimeout)
 	defer cancel()
 
-	var more bool
+	var result batchResult
 
 	err := r.tx.Do(
 		ctx, func(ctx context.Context) error {
 			now := time.Now().UTC()
 
-			msgs, err := r.repo.Unpublished(ctx, r.batchSize, now)
+			msgs, err := r.repo.Unpublished(ctx, limit, now)
 			if err != nil {
 				return fmt.Errorf("load unpublished messages: %w", err)
 			}
@@ -102,6 +211,11 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 			}
 
 			sent, failed := r.publish(ctx, msgs)
+
+			result = batchResult{
+				attempted:    len(msgs),
+				acknowledged: len(sent),
+			}
 
 			if len(sent) > 0 {
 				if err := r.repo.MarkPublished(ctx, sent, now); err != nil {
@@ -115,13 +229,11 @@ func (r *Relay) publishBatch(ctx context.Context) (bool, error) {
 				}
 			}
 
-			more = len(msgs) == r.batchSize
-
 			return nil
 		},
 	)
 
-	return more, err
+	return result, err
 }
 
 func (r *Relay) publish(ctx context.Context, msgs []Message) ([]uuid.UUID, []Failure) {
@@ -169,4 +281,16 @@ func (r *Relay) publish(ctx context.Context, msgs []Message) ([]uuid.UUID, []Fai
 
 func retryDelay(attempt int) time.Duration {
 	return min(minRetryDelay<<min(attempt-1, 20), maxRetryDelay)
+}
+
+func waitFor(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return ctx.Err() == nil
+	}
 }

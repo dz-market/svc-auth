@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	pollInterval = time.Second
-	batchSize    = 2
-	batchTimeout = 10 * time.Second
-	maxAttempts  = 3
+	pollInterval    = time.Second
+	batchSize       = 2
+	batchTimeout    = 10 * time.Second
+	maxAttempts     = 3
+	recoveryBackoff = 5 * time.Second
 )
 
 //nolint:gochecknoglobals // test fixtures
@@ -41,6 +42,16 @@ type testRelay struct {
 func newTestRelay(t *testing.T) testRelay {
 	t.Helper()
 
+	return newTestRelayWithAvailability(
+		t, func(context.Context) error {
+			return nil
+		},
+	)
+}
+
+func newTestRelayWithAvailability(t *testing.T, checkAvailability func(context.Context) error) testRelay {
+	t.Helper()
+
 	r := testRelay{
 		tx:        mocks.NewMockTransactor(t),
 		publisher: mocks.NewMockPublisher(t),
@@ -58,14 +69,20 @@ func newTestRelay(t *testing.T) testRelay {
 
 	r.relay = outbox.New(
 		outbox.Options{
-			Tx:           r.tx,
-			Repo:         r.repo,
-			Publisher:    r.publisher,
+			Tx:                r.tx,
+			Repo:              r.repo,
+			Publisher:         r.publisher,
+			CheckAvailability: checkAvailability,
+			Log:               slog.New(slog.DiscardHandler),
+
 			PollInterval: pollInterval,
 			BatchSize:    batchSize,
 			BatchTimeout: batchTimeout,
 			MaxAttempts:  maxAttempts,
-			Log:          slog.New(slog.DiscardHandler),
+
+			AvailabilityCheckTimeout: 2 * time.Second,
+			InitialRecoveryBackoff:   recoveryBackoff,
+			MaxRecoveryBackoff:       time.Minute,
 		},
 	)
 
