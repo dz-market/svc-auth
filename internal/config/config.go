@@ -8,8 +8,7 @@ import (
 )
 
 type Config struct {
-	ServiceName     string        `validate:"required"      yaml:"service_name"`
-	ShutdownTimeout time.Duration `validate:"required,gt=0" yaml:"shutdown_timeout"`
+	ServiceName string `validate:"required" yaml:"service_name"`
 
 	GRPC     GRPC     `yaml:"grpc"`
 	Postgres Postgres `yaml:"postgres"`
@@ -21,9 +20,10 @@ type Config struct {
 }
 
 type GRPC struct {
-	Addr           string           `validate:"required"                          yaml:"addr"`
-	Reflection     bool             `yaml:"reflection"`
-	MaxRecvMsgSize pconfig.ByteSize `validate:"required,minsize=1KB,maxsize=64MB" yaml:"max_recv_msg_size"`
+	Addr            string           `validate:"required"                          yaml:"addr"`
+	Reflection      bool             `yaml:"reflection"`
+	MaxRecvMsgSize  pconfig.ByteSize `validate:"required,minsize=1KB,maxsize=64MB" yaml:"max_recv_msg_size"`
+	ShutdownTimeout time.Duration    `validate:"required,gt=0"                     yaml:"shutdown_timeout"`
 
 	Keepalive Keepalive `yaml:"keepalive"`
 }

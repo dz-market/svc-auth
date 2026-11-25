@@ -1,13 +1,32 @@
 service_name: svc-auth
-shutdown_timeout: 10s
 
 grpc:
     addr: "${env:GRPC_ADDR}"
     reflection: "${env:GRPC_REFLECTION:-false}"
     max_recv_msg_size: 1MB
+    shutdown_timeout: 10s
     keepalive:
         max_connection_age: 30m
         max_connection_age_grace: 10m
+
+auth:
+    access:
+        ttl: 15m
+        issuer: svc-auth
+        audience: [marketplace]
+        private_key: "${vault:transit/export/signing-key/access-token#keys.1}"
+    refresh:
+        length: 32
+    session:
+        ttl: 720h
+    password:
+        argon2id:
+            memory: 19MB
+            iterations: 2
+            parallelism: 1
+            salt_length: 16
+            key_length: 32
+            max_in_flight: 8
 
 postgres:
     dsn: "${env:POSTGRES_DSN}"
@@ -28,25 +47,6 @@ outbox:
     batch_size: 100
     batch_timeout: 10s
     max_attempts: 10
-
-auth:
-    access:
-        ttl: 15m
-        issuer: svc-auth
-        audience: [marketplace]
-        private_key: "${vault:transit/export/signing-key/access-token#keys.1}"
-    refresh:
-        length: 32
-    session:
-        ttl: 720h
-    password:
-        argon2id:
-            memory: 19MB
-            iterations: 2
-            parallelism: 1
-            salt_length: 16
-            key_length: 32
-            max_in_flight: 8
 
 health:
     period: 5s
