@@ -47,6 +47,7 @@ type Postgres struct {
 type Kafka struct {
 	Brokers         []string      `validate:"required,min=1,dive,required" yaml:"brokers"`
 	DeliveryTimeout time.Duration `validate:"required,gt=0"                yaml:"delivery_timeout"`
+	LogLevel        slog.Level    `yaml:"log_level"`
 }
 
 type Outbox struct {

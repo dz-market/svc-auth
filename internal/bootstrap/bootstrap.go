@@ -25,16 +25,16 @@ func Run(ctx context.Context, version string) error {
 		return err
 	}
 
-	log, err := logger.New(
-		logger.Options{
-			Format: logger.Format(cfg.Log.Format),
-			HandlerOptions: slog.HandlerOptions{
-				Level: cfg.Log.Level,
-			},
-			Service: cfg.ServiceName,
-			Version: version,
+	logOpts := logger.Options{
+		Format: logger.Format(cfg.Log.Format),
+		HandlerOptions: slog.HandlerOptions{
+			Level: cfg.Log.Level,
 		},
-	)
+		Service: cfg.ServiceName,
+		Version: version,
+	}
+
+	log, err := logger.New(logOpts)
 	if err != nil {
 		return fmt.Errorf("create logger: %w", err)
 	}
@@ -66,12 +66,20 @@ func Run(ctx context.Context, version string) error {
 	}
 	defer postgresPool.Close()
 
+	kafkaLogOpts := logOpts
+	kafkaLogOpts.HandlerOptions.Level = cfg.Kafka.LogLevel
+
+	kafkaLog, err := logger.New(kafkaLogOpts)
+	if err != nil {
+		return fmt.Errorf("create kafka logger: %w", err)
+	}
+
 	kafkaProducerClient, err := kafka.NewProducerClient(
 		kafka.ProducerOptions{
 			Brokers:         cfg.Kafka.Brokers,
 			ClientID:        cfg.ServiceName,
 			DeliveryTimeout: cfg.Kafka.DeliveryTimeout,
-			Log:             log,
+			Log:             kafkaLog,
 		},
 	)
 	if err != nil {
