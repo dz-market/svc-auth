@@ -9,8 +9,9 @@ require (
 	github.com/dz-market/platform/config v0.7.0
 	github.com/dz-market/platform/config/resolver/vault v0.1.0
 	github.com/dz-market/platform/database/postgres v0.7.0
-	github.com/dz-market/platform/grpc v0.7.0
-	github.com/dz-market/platform/logger v0.6.0
+	github.com/dz-market/platform/grpc v0.8.0
+	github.com/dz-market/platform/logctx v0.1.0
+	github.com/dz-market/platform/logger v0.7.0
 	github.com/dz-market/platform/vault v0.7.0
 	github.com/dz-market/protobuf v0.6.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -93,14 +94,14 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260820142414-ca536658362e // indirect
 	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261123191846-1e707ab9fbc2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

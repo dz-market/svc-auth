@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dz-market/platform/logger"
+	"github.com/dz-market/platform/logctx"
 
 	"github.com/dz-market/svc-auth/internal/delivery/grpc/identity"
 )
@@ -42,7 +42,7 @@ func Auth(verifier TokenVerifier) grpc.UnaryServerInterceptor {
 				},
 			)
 
-			ctx = logger.With(ctx, slog.String("user_id", userID.String()))
+			ctx = logctx.With(ctx, slog.String("user_id", userID.String()))
 
 			return ctx, nil
 		},
