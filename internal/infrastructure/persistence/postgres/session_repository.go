@@ -42,6 +42,7 @@ func (r *SessionRepository) ByID(ctx context.Context, id uuid.UUID) (session.Ses
 		SELECT id, user_id, created_at, expires_at, revoked_at
 		FROM sessions
 		WHERE id = $1
+		FOR UPDATE
 	`
 
 	var s session.Session

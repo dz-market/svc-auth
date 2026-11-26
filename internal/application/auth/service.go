@@ -190,8 +190,6 @@ type RefreshOutput struct {
 }
 
 func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, error) {
-	now := time.Now().UTC()
-
 	rt, err := s.refreshTokens.ByHash(ctx, s.refreshTokenGenerator.Fingerprint(in.RefreshToken))
 	if err != nil {
 		if errors.Is(err, session.ErrRefreshTokenNotFound) {
@@ -201,26 +199,24 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 		return RefreshOutput{}, fmt.Errorf("find refresh token: %w", err)
 	}
 
-	sess, err := s.sessions.ByID(ctx, rt.SessionID)
-	if err != nil {
-		if errors.Is(err, session.ErrSessionNotFound) {
-			return RefreshOutput{}, session.ErrInvalidRefreshToken
-		}
-
-		return RefreshOutput{}, fmt.Errorf("find session: %w", err)
-	}
-
-	if !sess.IsActive(now) {
-		return RefreshOutput{}, session.ErrInvalidRefreshToken
-	}
-
-	issued, err := s.issueTokens(sess, now)
-	if err != nil {
-		return RefreshOutput{}, err
-	}
+	var issued issuedTokens
 
 	err = s.tx.Do(
 		ctx, func(ctx context.Context) error {
+			sess, err := s.sessions.ByID(ctx, rt.SessionID)
+			if err != nil {
+				if errors.Is(err, session.ErrSessionNotFound) {
+					return session.ErrInvalidRefreshToken
+				}
+
+				return fmt.Errorf("find session: %w", err)
+			}
+
+			now := time.Now().UTC()
+			if !sess.IsActive(now) {
+				return session.ErrInvalidRefreshToken
+			}
+
 			marked, err := s.refreshTokens.MarkUsed(ctx, rt.ID, now)
 			if err != nil {
 				return err
@@ -228,6 +224,11 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput) (RefreshOutput, 
 
 			if !marked {
 				return session.ErrInvalidRefreshToken
+			}
+
+			issued, err = s.issueTokens(sess, now)
+			if err != nil {
+				return err
 			}
 
 			return s.refreshTokens.Create(ctx, issued.refreshToken)
@@ -248,10 +249,19 @@ type LogoutInput struct {
 }
 
 func (s *Service) Logout(ctx context.Context, in LogoutInput) error {
-	now := time.Now().UTC()
-
 	err := s.tx.Do(
 		ctx, func(ctx context.Context) error {
+			_, err := s.sessions.ByID(ctx, in.SessionID)
+			if err != nil {
+				if errors.Is(err, session.ErrSessionNotFound) {
+					return nil
+				}
+
+				return fmt.Errorf("find session: %w", err)
+			}
+
+			now := time.Now().UTC()
+
 			if err := s.sessions.Revoke(ctx, in.SessionID, now); err != nil {
 				return err
 			}

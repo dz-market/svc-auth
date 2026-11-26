@@ -528,10 +528,23 @@ func TestService_Refresh(t *testing.T) {
 			wantErr: errFailed,
 		},
 		{
+			name: "transaction error",
+			setup: func(s testService) {
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+
+				s.tx.EXPECT().
+					Do(mock.Anything, mock.Anything).
+					Return(errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
 			name: "session not found",
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
+				expectTransaction(s)
 
 				s.sessions.EXPECT().
 					ByID(mock.Anything, storedSession.ID).
@@ -544,6 +557,7 @@ func TestService_Refresh(t *testing.T) {
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
+				expectTransaction(s)
 
 				s.sessions.EXPECT().
 					ByID(mock.Anything, storedSession.ID).
@@ -556,6 +570,7 @@ func TestService_Refresh(t *testing.T) {
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
+				expectTransaction(s)
 
 				revokedAt := fixedNow
 
@@ -573,6 +588,7 @@ func TestService_Refresh(t *testing.T) {
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
+				expectTransaction(s)
 
 				expired := storedSession
 				expired.ExpiresAt = fixedNow
@@ -584,54 +600,12 @@ func TestService_Refresh(t *testing.T) {
 			wantErr: session.ErrInvalidRefreshToken,
 		},
 		{
-			name: "issue access token error",
-			setup: func(s testService) {
-				expectFingerprint(s)
-				expectRefreshTokenFound(s)
-				expectSessionFound(s)
-
-				s.issuer.EXPECT().
-					Issue(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return("", errFailed)
-			},
-			wantErr: errFailed,
-		},
-		{
-			name: "generate refresh token error",
-			setup: func(s testService) {
-				expectFingerprint(s)
-				expectRefreshTokenFound(s)
-				expectSessionFound(s)
-				expectAccessIssue(s)
-
-				s.generator.EXPECT().
-					Generate().
-					Return("", nil, errFailed)
-			},
-			wantErr: errFailed,
-		},
-		{
-			name: "transaction error",
-			setup: func(s testService) {
-				expectFingerprint(s)
-				expectRefreshTokenFound(s)
-				expectSessionFound(s)
-				expectTokensIssued(s)
-
-				s.tx.EXPECT().
-					Do(mock.Anything, mock.Anything).
-					Return(errFailed)
-			},
-			wantErr: errFailed,
-		},
-		{
 			name: "mark refresh token used error",
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
-				expectSessionFound(s)
-				expectTokensIssued(s)
 				expectTransaction(s)
+				expectSessionFound(s)
 
 				s.refreshTokens.EXPECT().
 					MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
@@ -644,9 +618,8 @@ func TestService_Refresh(t *testing.T) {
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
-				expectSessionFound(s)
-				expectTokensIssued(s)
 				expectTransaction(s)
+				expectSessionFound(s)
 
 				s.refreshTokens.EXPECT().
 					MarkUsed(mock.Anything, storedRefreshToken.ID, fixedNow).
@@ -655,14 +628,45 @@ func TestService_Refresh(t *testing.T) {
 			wantErr: session.ErrInvalidRefreshToken,
 		},
 		{
+			name: "issue access token error",
+			setup: func(s testService) {
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectTransaction(s)
+				expectSessionFound(s)
+				expectTokenMarkedUsed(s)
+
+				s.issuer.EXPECT().
+					Issue(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return("", errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
+			name: "generate refresh token error",
+			setup: func(s testService) {
+				expectFingerprint(s)
+				expectRefreshTokenFound(s)
+				expectTransaction(s)
+				expectSessionFound(s)
+				expectTokenMarkedUsed(s)
+				expectAccessIssue(s)
+
+				s.generator.EXPECT().
+					Generate().
+					Return("", nil, errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
 			name: "create refresh token error",
 			setup: func(s testService) {
 				expectFingerprint(s)
 				expectRefreshTokenFound(s)
-				expectSessionFound(s)
-				expectTokensIssued(s)
 				expectTransaction(s)
+				expectSessionFound(s)
 				expectTokenMarkedUsed(s)
+				expectTokensIssued(s)
 
 				s.refreshTokens.EXPECT().
 					Create(mock.Anything, mock.Anything).
@@ -717,6 +721,7 @@ func TestService_Logout(t *testing.T) {
 			name: "success",
 			setup: func(s testService) {
 				expectTransaction(s)
+				expectSessionFound(s)
 				expectSessionRevoked(s)
 				expectSessionTokensMarkedUsed(s)
 			},
@@ -731,9 +736,21 @@ func TestService_Logout(t *testing.T) {
 			wantErr: errFailed,
 		},
 		{
+			name: "find session error",
+			setup: func(s testService) {
+				expectTransaction(s)
+
+				s.sessions.EXPECT().
+					ByID(mock.Anything, storedSession.ID).
+					Return(session.Session{}, errFailed)
+			},
+			wantErr: errFailed,
+		},
+		{
 			name: "revoke session error",
 			setup: func(s testService) {
 				expectTransaction(s)
+				expectSessionFound(s)
 
 				s.sessions.EXPECT().
 					Revoke(mock.Anything, storedSession.ID, fixedNow).
@@ -745,6 +762,7 @@ func TestService_Logout(t *testing.T) {
 			name: "mark session refresh tokens used error",
 			setup: func(s testService) {
 				expectTransaction(s)
+				expectSessionFound(s)
 				expectSessionRevoked(s)
 
 				s.refreshTokens.EXPECT().
